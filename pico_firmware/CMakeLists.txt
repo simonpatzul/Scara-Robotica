@@ -22,3 +22,11 @@ target_link_libraries(scara_fw pico_stdlib pico_multicore hardware_pio hardware_
 pico_enable_stdio_usb(scara_fw 1)
 pico_enable_stdio_uart(scara_fw 0)
 pico_add_extra_outputs(scara_fw)
+
+# Prueba de finales de carrera (programa aparte, motores apagados)
+add_executable(prueba_limites src/prueba_limites.cpp src/limit_switch.cpp)
+target_include_directories(prueba_limites PRIVATE config)
+target_link_libraries(prueba_limites pico_stdlib)
+pico_enable_stdio_usb(prueba_limites 1)
+pico_enable_stdio_uart(prueba_limites 0)
+pico_add_extra_outputs(prueba_limites)
