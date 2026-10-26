@@ -32,7 +32,9 @@ void Axis::update() {
     if (state_ == AxisState::Homing) homing_step();
     else if (state_ == AxisState::Ready) {
         // El RST trabaja en el motor: la referencia de la articulación se multiplica por la relación
-        const float u = rst_.step(target_rad_ * cfg_.gear_ratio, motor_rad_);   // voltios
+        float u = rst_.step(target_rad_ * cfg_.gear_ratio, motor_rad_);   // voltios
+        // Final de carrera presionado: no empujar más hacia él (home_volts lleva el signo hacia el límite)
+        if (limit_.pressed() && u * cfg_.home_volts > 0.0f) u = 0.0f;
         driver_.set(u / cfg_.supply_volts);
         u_volts_ = u;
     }
