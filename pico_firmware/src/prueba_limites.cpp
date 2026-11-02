@@ -7,8 +7,8 @@
 
 // Mismos pines que config/axis_config.h (todos activos en bajo)
 LimitSwitch lim_r1(19, true);
-LimitSwitch lim_r2(21, true);
-LimitSwitch lim_p(20, true);
+LimitSwitch lim_r2(20, true);
+LimitSwitch lim_p(21, true);
 
 // Enables de los drivers (R1: 7,6  R2: 3,2  P: 17,16) en bajo = motores apagados
 const uint ENABLES[] = { 7, 6, 3, 2, 17, 16 };
@@ -28,7 +28,7 @@ int main() {
     printf("\nPrueba de finales de carrera (motores apagados). 1 = presionado\n");
 
     bool antes[3] = { false, false, false };
-    const char* nombres[3] = { "R1 (GP19)", "R2 (GP21)", "P (GP20)" };
+    const char* nombres[3] = { "R1 (GP19)", "R2 (GP20)", "P (GP21)" };
     while (true) {
         const bool ahora[3] = { lim_r1.pressed(), lim_r2.pressed(), lim_p.pressed() };
         printf("R1=%d  R2=%d  P=%d\n", ahora[0], ahora[1], ahora[2]);
