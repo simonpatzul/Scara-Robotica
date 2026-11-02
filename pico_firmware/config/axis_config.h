@@ -51,8 +51,8 @@ constexpr RstParams RST_R1 = {
 
 //                              name  encA encB sm  cuentas  ratio  sign  pwmL pwmR enL enR  volts  maxDuty  limite activeLow  homeV  objetivo timeout   rst      min   max
 constexpr AxisConfig AXIS_R1 = { "R1", 11, 10, 0, 3200.0f, 3.0f, -1.0f,  4,   5,   7,  6, 12.0f, 0.50f,    19,    true,   -3.0f,  1.81f, 15000, &RST_R1, -1.72f, 1.95f };
-constexpr AxisConfig AXIS_R2 = { "R2", 12, 13, 1, 3200.0f, 3.0f, -1.0f,  0,   1,   3,  2, 12.0f, 0.50f,    21,    true,   -2.5f,  1.467f, 15000, &RST_R1, -1.40f, 1.48f };
+constexpr AxisConfig AXIS_R2 = { "R2", 12, 13, 1, 3200.0f, 3.0f, -1.0f,  0,   1,   3,  2, 12.0f, 0.50f,    20,    true,   -2.5f,  1.467f, 15000, &RST_R1, -1.40f, 1.48f };
 
 // Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo.
 // pwmL/pwmR van cruzados (14 = RPWM, 15 = LPWM) para que voltaje positivo = subir.
-constexpr AxisConfig AXIS_P  = { "P",   8,  9, 2, 3200.0f, 3.14159265f, -1.0f, 14, 15, 17, 16, 12.0f, 1.00f,   20,    true,   -8.0f,  0.0f,  30000, &RST_R1, 0.0f, 85.0f };
+constexpr AxisConfig AXIS_P  = { "P",   8,  9, 2, 3200.0f, 3.14159265f, -1.0f, 14, 15, 17, 16, 12.0f, 1.00f,   21,    true,   -8.0f,  0.0f,  30000, &RST_R1, 0.0f, 85.0f };

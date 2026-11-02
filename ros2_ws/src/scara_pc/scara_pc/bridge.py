@@ -1,12 +1,15 @@
 # Puente PC <-> Pico. Es el ÚNICO nodo que toca el puerto serie.
 #   Escucha  /scara/target        (Float64MultiArray: [r1 rad, r2 rad, p mm])
 #   Publica  /scara/joint_states  (JointState: posiciones medidas, mismas unidades)
+#   Escucha  /scara/bomba         (Bool: true = prender)       -> manda "B1" / "B0"
+#   Escucha  /scara/servo         (Float64: grados 0..180)     -> manda "S<grados>"
 # Manda el último objetivo a la Pico a tasa fija, así su watchdog nunca se dispara
-# mientras este nodo esté vivo. Si el nodo muere o se desconecta el USB, la Pico se queda quieta.
+# mientras este nodo esté vivo. Si el nodo muere o se desconecta el USB, la Pico se queda quieta
+# y apaga la bomba.
 import serial
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Bool, Float64, Float64MultiArray
 from sensor_msgs.msg import JointState
 
 JOINTS = ['joint_r1', 'joint_r2', 'joint_p']
@@ -24,6 +27,8 @@ class Bridge(Node):
         self.target = [0.0, 0.0, 0.0]   # después del home los tres ejes quedan en 0
         self.pub = self.create_publisher(JointState, '/scara/joint_states', 10)
         self.create_subscription(Float64MultiArray, '/scara/target', self.on_target, 10)
+        self.create_subscription(Bool, '/scara/bomba', self.on_bomba, 10)
+        self.create_subscription(Float64, '/scara/servo', self.on_servo, 10)
         self.create_timer(1.0 / rate, self.tick)
 
     def home(self):
@@ -41,6 +46,15 @@ class Bridge(Node):
     def on_target(self, msg):
         if len(msg.data) == 3:
             self.target = list(msg.data)
+
+    def on_bomba(self, msg):
+        self.ser.write(b'B1\n' if msg.data else b'B0\n')
+        self.get_logger().info(f'Bomba {"prendida" if msg.data else "apagada"}')
+
+    def on_servo(self, msg):
+        grados = int(round(min(max(msg.data, 0.0), 180.0)))
+        self.ser.write(f'S{grados}\n'.encode())
+        self.get_logger().info(f'Servo a {grados} grados')
 
     def tick(self):
         r1, r2, p = self.target

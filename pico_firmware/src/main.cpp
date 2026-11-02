@@ -2,7 +2,32 @@
 #include <cstdlib>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/pwm.h"
 #include "axis.h"
+
+// ---------- Bomba (GP22, salida digital) y servo (GP26, PWM 50 Hz) ----------
+// Órdenes aparte de "r1,r2,p":  "B1" / "B0" = prender / apagar bomba,  "S<grados>" (0..180) = servo.
+const uint PIN_BOMBA = 22;
+const uint PIN_SERVO = 26;
+
+void bomba_servo_init() {
+    gpio_init(PIN_BOMBA);
+    gpio_set_dir(PIN_BOMBA, GPIO_OUT);
+    gpio_put(PIN_BOMBA, 0);                    // arranca apagada
+    gpio_set_function(PIN_SERVO, GPIO_FUNC_PWM);
+    const uint slice = pwm_gpio_to_slice_num(PIN_SERVO);
+    pwm_set_clkdiv(slice, 125.0f);             // contador a 1 MHz: el nivel queda en microsegundos
+    pwm_set_wrap(slice, 19999);                // 20 ms = 50 Hz
+    pwm_set_gpio_level(PIN_SERVO, 0);          // sin pulso hasta la primera orden: no se mueve al arrancar
+    pwm_set_enabled(slice, true);
+}
+
+void servo_grados(int grados) {
+    if (grados < 0) grados = 0;
+    if (grados > 180) grados = 180;
+    pwm_set_gpio_level(PIN_SERVO, 500 + grados * 2000 / 180);   // 0° = 500 us, 180° = 2500 us
+    printf("SERVO=%d\n", grados);
+}
 
 // Los ejes que controla esta Pico. Para agregar uno: su AxisConfig en axis_config.h y una línea aquí.
 Axis axes[] = { Axis(AXIS_R1), Axis(AXIS_R2), Axis(AXIS_P) };
@@ -79,6 +104,7 @@ bool home(Axis& a) {
 int main() {
     stdio_init_all();
     for (Axis& a : axes) a.init();      // hardware listo antes de arrancar el lazo
+    bomba_servo_init();
     multicore_launch_core1(core1_main);
 
     sleep_ms(3000);                     // tiempo para abrir el monitor serie
@@ -104,7 +130,15 @@ int main() {
     while (true) {
         if (poll_line(line, sizeof(line), n)) {
             float t[3];
-            if (parse_targets(line, t)) {
+            if ((line[0] == 'B') && (line[1] == '0' || line[1] == '1') && line[2] == '\0') {
+                gpio_put(PIN_BOMBA, line[1] == '1');
+                printf("BOMBA=%c\n", line[1]);
+            } else if (line[0] == 'S') {
+                char* end;
+                const long g = strtol(line + 1, &end, 10);
+                if (end != line + 1 && *end == '\0') servo_grados(static_cast<int>(g));
+                else printf("ERR\n");
+            } else if (parse_targets(line, t)) {
                 for (int i = 0; i < N_AXES; ++i) axes[i].set_target_rad(t[i]);
                 last_cmd = get_absolute_time();
                 holding = false;
@@ -119,6 +153,7 @@ int main() {
         // Watchdog: el PC dejó de mandar (soltó el botón, se colgó o se desconectó) -> quedarse quieto
         if (!holding && absolute_time_diff_us(last_cmd, get_absolute_time()) > WATCHDOG_MS * 1000) {
             for (Axis& a : axes) a.set_target_rad(a.position_rad());
+            gpio_put(PIN_BOMBA, 0);   // sin PC, la bomba también se apaga
             holding = true;
         }
     }
