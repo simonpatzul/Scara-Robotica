@@ -1369,10 +1369,12 @@ svg text { font-size: var(--fs, var(--t-chico)); font-weight: 400; }
     client = window.mqtt.connect(cfg.url, { clientId: "scada-" + Math.random().toString(16).slice(2, 10), reconnectPeriod: 3000, connectTimeout: 8000,
       username: cfg.user || undefined, password: cfg.pass || undefined, clean: true });
     client.on("connect", () => { S.mqttOk = true; $("connState").textContent = "Conectado"; client.subscribe([`${pre}/estado`, `${pre}/evento`, `${pre}/est1`], { qos: 1 }); renderResumen(); });
+    if (PUBLICA) client.on("connect", () => client.subscribe(`${pre}/rviz`, { qos: 0 }));
     client.on("reconnect", () => { $("connState").textContent = "Reintentando…"; });
     client.on("close", () => { S.mqttOk = false; renderResumen(); });
     client.on("error", (e) => { $("connState").innerHTML = `<span class="err">Error: ${String(e && e.message || e).replace(/</g, "&lt;")}</span>`; });
     client.on("message", (topic, buf) => {
+      if (topic === `${pre}/rviz`) return fotoRviz(buf);
       let j; try { j = JSON.parse(buf.toString()); } catch { return; }
       const sub = topic.slice(pre.length + 1);
       if (sub === "estado") onEstado(j); else if (sub === "evento") onEvento(j); else if (sub === "est1") onEst1(j);
@@ -1428,17 +1430,25 @@ svg text { font-size: var(--fs, var(--t-chico)); font-weight: 400; }
     pintarRviz();
   }
   // Visor: solo pide el video con la pestaña a la vista. Si RViz no da imagen se dice, nunca se deja una imagen vieja como si fuera actual
-  const PUBLICA = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // publicada en la web: sin servidor ni RViz
+  const PUBLICA = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // publicada en la web: sin servidor; RViz llega por MQTT
+  let tRviz = 0, urlRviz = null;
+  function fotoRviz(buf) {
+    const url = URL.createObjectURL(new Blob([buf], { type: "image/jpeg" }));
+    $("rvizImg").src = url;
+    if (urlRviz) URL.revokeObjectURL(urlRviz);
+    urlRviz = url; tRviz = Date.now();
+  }
   function pintarRviz(reconectar) {
     const img = $("rvizImg"), r = acc.rviz, mirando = !$("paneResumen").hidden && !document.hidden && !!(r && r.abierto);
-    if (reconectar || !mirando) img.removeAttribute("src");
-    if (mirando && !img.getAttribute("src")) img.src = `rviz.mjpg?${Date.now()}`;
+    if (!PUBLICA && (reconectar || !mirando)) img.removeAttribute("src");
+    if (!PUBLICA && mirando && !img.getAttribute("src")) img.src = `rviz.mjpg?${Date.now()}`;
     const edad = r ? r.edad_s : null, fresca = edad != null && edad < 2;
     const fijar = (cls, txt, tit, sub, cmd) => {
       $("rvizEstado").className = "visor-estado " + cls; $("rvizTxt").textContent = txt; $("rvizTit").textContent = tit; $("rvizSub").textContent = sub;
       $("rvizCmd").hidden = !cmd; $("rvizMsg").hidden = !tit; img.hidden = !!tit;
     };
-    if (PUBLICA) fijar("", "Solo lectura", "Vista 3D solo en el PC del robot", "Esta página pública muestra la telemetría en vivo y no puede mover el robot.");
+    if (PUBLICA && Date.now() - tRviz < 3000) fijar("ok", "En vivo", "", "");
+    else if (PUBLICA) fijar("", "Solo lectura", "Esperando la imagen de RViz", "Esta página pública muestra el robot en vivo y no puede moverlo.");
     else if (!acc.hay) fijar("bad", "Sin servidor", "No responde el servidor de la página", "Revisa que scada_web.py esté corriendo.");
     else if (!r || !r.abierto) fijar("", "RViz cerrado", "RViz está cerrado", "Ábrelo en una terminal, desde SCARA_Robotica. Solo muestra el robot, no lo mueve:", true);
     else if (edad == null) fijar("", "Cargando", "Conectando con RViz", "");
