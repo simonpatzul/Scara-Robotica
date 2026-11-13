@@ -3,6 +3,9 @@
 // Para replicar en otro eje: copias el bloque y cambias los números.
 #include <cstdint>
 #include "rst_controller.h"
+#include "rst_activo.h"   // lo genera herramientas/rst_diseno.py: el controlador que se elige en la página
+
+constexpr uint8_t NO_PIN = 0xFF;   // el driver no tiene ese pin (los EN de la PCB nueva los maneja el STM32)
 
 struct AxisConfig {
     const char* name;
@@ -33,26 +36,30 @@ struct AxisConfig {
     const RstParams* rst;      // coeficientes del RST de este motor
     float angle_min_rad;       // rango permitido para el objetivo (articulación, rad)
     float angle_max_rad;
+    bool limit_stop = false;   // true: tras el home el final de carrera también detiene el eje (no se empuja hacia él)
+    float home_slow_volts = 0.0f;   // home lento: se aleja del límite y lo vuelve a tocar con este voltaje, y frena hasta él al llegar al objetivo.
+                                    // 0 = un solo toque y GoTo a home_volts
+    float vel_max = 1.0f;           // el objetivo que sigue el RST avanza a esta velocidad como mucho (rad/s, o mm/s en P):
+                                    // sin esto un salto de objetivo arranca los ejes a tope a la vez y el pico de corriente cuelga la Pico
 };
 
 constexpr uint32_t CONTROL_PERIOD_US = 10000;  // Ts = 10 ms, el mismo de la identificación
 
-// RST del Pololu #4753, Ts = 10 ms, ángulo del motor en rad, u en voltios (control/rst_motor_v3.m).
-// Modelo de diseño: Kv / (s (tau s + 1)) con Kv = 1.8 rad/s/V (tu identificación) y tau = 0.04 s
-// (lo que muestran los datos del home en el robot). Polos: doble en wn = 6 rad/s, auxiliares en 0.7.
-// Los ceros al final son relleno (no cambian nada).
-constexpr RstParams RST_R1 = {
-    { 2.059447617952, -1.561290298166, -2.047948810692, 1.572789105426, 0.0 },
-    { 1.0, -1.208998870792, 0.394471201417, 0.0 },
-    { 251.156203565986, -1000.488037304793, 1585.381209607035, -1249.331488730012, 489.710270900887, -76.405160424582, 0.0, 0.0 },
-    { 1.0, -1.902459, 0.904837 },
-    0.002378
-};
+// RST_ACTIVO (rst_activo.h) es el controlador que corre en los tres ejes.
+// PCB nueva (scara_v2): puentes IFX007T con IN por sentido; los EN los maneja el STM32 (NO_PIN aquí).
+// Pines del esquemático: M1 = GP0/GP1 (motor en P1, HOMBRO), M2 = GP2/GP3 (P2, CODO), M3 = GP6/GP7 (P).
+// Encoders GP10-15 (por 3.3 V del traductor de nivel). Finales: codo GP17, P GP18, hombro GP19 (como los dejó el usuario).
+// Los números de home y rango vienen de scara_rst.ino (probado en el robot), pasados a nuestra convención de signos:
+// allá los ángulos crecen hacia el final; aquí el final queda del lado negativo, como en la cinemática y las secuencias.
+// El objetivo nunca llega al final: el mínimo queda 0.02 rad antes (y el tope del final lo detiene igual).
+// Signos de encoder probados en el robot: el 09-11 el hombro giró hacia su final y el encoder decía lo contrario; el 10-11 el codo igual.
+//                              name  encA encB sm  cuentas  ratio  sign  pwmL pwmR  enL     enR    volts  maxDuty  limite activeLow homeV  objetivo timeout
+constexpr AxisConfig AXIS_R1 = { "R1", 12, 13, 0, 3200.0f, 3.0f, -1.0f,  3,   2, NO_PIN, NO_PIN, 12.0f, 0.50f,    18,    true,   -3.0f,  1.83f,  30000, &RST_ACTIVO, -1.81f, 1.885f, true, 2.5f };   // CODO, motor en P2
+// 13-11 (scara_prueba_pines con los 5 V ya en 5 V): GP1 lleva el hombro a su final (GP19), GP3 el codo hacia el suyo
+// y GP6 sube P. El encoder de P cuenta al reves que los otros dos respecto a su voltaje positivo: signo -1.
+// 13-11, finales apretados a mano en orden hombro, codo, P: dieron GP19, GP18, GP17. Codo = GP18 y P = GP17.
+constexpr AxisConfig AXIS_R2 = { "R2", 10, 11, 1, 3200.0f, 3.0f, -1.0f,  1,   0, NO_PIN, NO_PIN, 12.0f, 0.50f,    19,    true,   -3.0f,  1.48f,  30000, &RST_ACTIVO, -1.46f, 1.5708f, true, 2.5f };  // HOMBRO, motor en P1
 
-//                              name  encA encB sm  cuentas  ratio  sign  pwmL pwmR enL enR  volts  maxDuty  limite activeLow  homeV  objetivo timeout   rst      min   max
-constexpr AxisConfig AXIS_R1 = { "R1", 11, 10, 0, 3200.0f, 3.0f, -1.0f,  4,   5,   7,  6, 12.0f, 0.50f,    19,    true,   -3.0f,  1.81f, 15000, &RST_R1, -1.72f, 1.95f };
-constexpr AxisConfig AXIS_R2 = { "R2", 12, 13, 1, 3200.0f, 3.0f, -1.0f,  0,   1,   3,  2, 12.0f, 0.50f,    20,    true,   -2.5f,  1.467f, 15000, &RST_R1, -1.40f, 1.48f };
-
-// Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo.
-// pwmL/pwmR van cruzados (14 = RPWM, 15 = LPWM) para que voltaje positivo = subir.
-constexpr AxisConfig AXIS_P  = { "P",   8,  9, 2, 3200.0f, 3.14159265f, -1.0f, 14, 15, 17, 16, 12.0f, 1.00f,   21,    true,   -8.0f,  0.0f,  30000, &RST_R1, 0.0f, 85.0f };
+// Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo. Hasta 50 mm (máximo mecánico).
+// pwmL/pwmR cruzados como en la PCB (M3_INA = GP7, M3_INB = GP6).
+constexpr AxisConfig AXIS_P  = { "P",  14, 15, 2, 3200.0f, 3.14159265f, -1.0f,  7,  6, NO_PIN, NO_PIN, 12.0f, 1.00f,   17,    true,   -8.0f,  0.0f,   30000, &RST_ACTIVO, 0.0f, 50.0f, false, 0.0f, 20.0f };

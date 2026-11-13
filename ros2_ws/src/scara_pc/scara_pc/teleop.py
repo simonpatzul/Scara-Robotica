@@ -1,9 +1,10 @@
 # Movimiento manual con teclado (solo terminal) + hombre muerto.
 #   Escucha  /scara/joint_states  (posición medida)
-#   Publica  /scara/target        ([r1 rad, r2 rad, p mm])
+#   Publica  /scara/target        ([r1 rad, r2 rad, p mm]), /scara/servo (grados) y /scara/bomba
 #
 # MANTÉN presionada la tecla para mover; al soltarla el robot se queda quieto (hombre muerto).
-#   Q / A = R1 + / -     W / S = R2 + / -     E / D = P + / -
+#   Q / A = R1 + / -     W / S = R2 + / -     E / D = P + / -     Z / X = servo - / +
+#   B / N = prender / apagar la bomba (basta una pulsación)
 #
 # La terminal no avisa cuando se suelta una tecla, pero mientras está presionada la REPITE:
 # primero llega una vez, luego hay una pausa (~0.5 s, retardo del teclado) y después llega
@@ -15,16 +16,21 @@ import termios
 import tty
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Bool, Float64, Float64MultiArray
 from sensor_msgs.msg import JointState
+from scara_pc.p2p import P_MAX
 
 # Cuánto adelante de la posición medida se pone el objetivo mientras la tecla está presionada.
 # Más grande = jog más rápido. Unidades: rad, rad, mm.
-LEAD = [0.05, 0.05, 1.0]
+LEAD = [0.2, 0.2, 2.5]
 FIRST_S = 0.8    # espera tras la PRIMERA pulsación: mayor que el retardo del teclado
 REPEAT_S = 0.05  # espera cuando ya está repitiendo: si no llega en este tiempo, se soltó
 STOP_S = 0.15     # al soltar, el objetivo sigue al robot este tiempo mientras frena y luego se fija
 KEYS = {'q': (0, +1), 'a': (0, -1), 'w': (1, +1), 's': (1, -1), 'e': (2, +1), 'd': (2, -1)}
+SERVO_KEYS = {'z': -1, 'x': +1}
+SERVO_VEL = 22.0    # °/s, igual que secuencia_caja.py: sin saltos, que piden un pico de corriente
+SERVO_MAX = 174.0   # el giro largo de las tarjetas 2 y 4
+TICK_S = 0.05
 
 
 class Teleop(Node):
@@ -36,13 +42,21 @@ class Teleop(Node):
         self.last_key_time = 0.0
         self.repeating = False  # ¿ya empezó la repetición automática del teclado?
         self.stop_until = None  # fin de la fase de frenado (None = no está frenando)
+        self.servo = 90.0       # último ángulo pedido: no hay medida del servo
         self.pub = self.create_publisher(Float64MultiArray, '/scara/target', 10)
+        self.pub_servo = self.create_publisher(Float64, '/scara/servo', 10)
+        self.pub_bomba = self.create_publisher(Bool, '/scara/bomba', 10)
         self.create_subscription(JointState, '/scara/joint_states', self.on_state, 10)
-        self.create_timer(0.05, self.tick)   # 20 Hz
-        self.get_logger().info('Mantén Q/A (R1), W/S (R2), E/D (P). Ctrl+C para salir.')
+        self.create_subscription(Float64, '/scara/servo', self.on_servo, 10)
+        self.create_timer(TICK_S, self.tick)   # 20 Hz
+        self.get_logger().info('Mantén Q/A (R1), W/S (R2), E/D (P), Z/X (servo). B/N: bomba. Ctrl+C para salir.')
 
     def on_state(self, msg):
         self.meas = list(msg.position)
+
+    def on_servo(self, msg):
+        if msg.data >= 0:   # así arranca desde donde lo dejó la secuencia
+            self.servo = msg.data
 
     def publish(self):
         self.pub.publish(Float64MultiArray(data=self.target))
@@ -51,7 +65,9 @@ class Teleop(Node):
         # Leer todas las teclas que llegaron desde el último ciclo, sin bloquear
         while select.select([sys.stdin], [], [], 0)[0]:
             c = sys.stdin.read(1).lower()
-            if c in KEYS:
+            if c in ('b', 'n'):
+                self.pub_bomba.publish(Bool(data=c == 'b'))
+            elif c in KEYS or c in SERVO_KEYS:
                 if c != self.key and self.meas is not None:
                     self.target = list(self.meas)   # tecla nueva: arranca desde donde está
                     self.repeating = False
@@ -82,8 +98,14 @@ class Teleop(Node):
             self.stop_until = now + STOP_S
             return
 
+        if self.key in SERVO_KEYS:
+            self.servo = min(max(self.servo + SERVO_KEYS[self.key] * SERVO_VEL * TICK_S, 0.0), SERVO_MAX)
+            self.pub_servo.publish(Float64(data=self.servo))
+            return
+
         axis, d = KEYS[self.key]
         self.target[axis] = self.meas[axis] + d * LEAD[axis]
+        self.target[2] = min(self.target[2], P_MAX)
         self.publish()
 
 

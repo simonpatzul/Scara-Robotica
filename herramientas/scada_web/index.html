@@ -1,0 +1,1826 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SCADA Estación 1 SCARA</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+/* HMI de la estación 1. Pestañas: Resumen, Estación y Ejes. En computador cada pestaña cabe en una pantalla
+   (lienzo de 900 px de alto escalado a la ventana); en celular las tarjetas se apilan. */
+:root {
+  --bg: #F5F5F7; --panel: #FFFFFF; --panel-2: #F0F0F3; --well: #F7F7F9; --bezel: rgba(0, 0, 0, .06); --accent: #007AFF; --bar: #FFFFFF;
+  --ink: #1D1D1F; --muted: #6E6E73; --line: rgba(0, 0, 0, .1);
+  --process: #1D1D1F; --on-process: #FFFFFF; --process-soft: rgba(0, 0, 0, .08); --signal: #007AFF; --medido: #007AFF; --referencia: #1D1D1F;
+  --ok: #248A3D; --warn: #C75300; --alarm: #D70015; --stale: #AEAEB2;
+  --card: #5aa883; --card-edge: #2f6f52; --h1: #f5c400;
+  --feat: #1D1D1F; --feat-ink: #ffffff; --feat-muted: rgba(255, 255, 255, .7); --feat-line: rgba(255, 255, 255, .14);
+  --shadow: none;
+  --t-chico: 15px; --t-texto: 16px; --t-seccion: 20px; --t-valor: 28px; --t-titulo: 30px;
+  --f-display: -apple-system, BlinkMacSystemFont, "SF Pro Text", Geist, "Helvetica Neue", Arial, sans-serif;
+  --f-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", Geist, "Helvetica Neue", Arial, sans-serif;
+  --f-data: -apple-system, BlinkMacSystemFont, "SF Pro Text", Geist, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --panel: #1C1C1E; --panel-2: #2C2C2E; --well: #161618; --bezel: rgba(255, 255, 255, .08); --accent: #0A84FF; --bar: #1C1C1E;
+    --ink: #F5F5F7; --muted: #A1A1A6; --line: rgba(255, 255, 255, .14);
+    --process: #F5F5F7; --on-process: #1D1D1F; --process-soft: rgba(255, 255, 255, .12); --signal: #0A84FF; --medido: #0A84FF; --referencia: #F5F5F7;
+    --ok: #30D158; --warn: #FF9F0A; --alarm: #FF453A; --stale: #636366; --card: #3f9e78; --card-edge: #8fe0bb;
+    --feat: #F5F5F7; --feat-ink: #1D1D1F; --feat-muted: rgba(0, 0, 0, .6); --feat-line: rgba(0, 0, 0, .12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --panel: #1C1C1E; --panel-2: #2C2C2E; --well: #161618; --bezel: rgba(255, 255, 255, .08); --accent: #0A84FF; --bar: #1C1C1E;
+    --ink: #F5F5F7; --muted: #A1A1A6; --line: rgba(255, 255, 255, .14);
+    --process: #F5F5F7; --on-process: #1D1D1F; --process-soft: rgba(255, 255, 255, .12); --signal: #0A84FF; --medido: #0A84FF; --referencia: #F5F5F7;
+    --ok: #30D158; --warn: #FF9F0A; --alarm: #FF453A; --stale: #636366; --card: #3f9e78; --card-edge: #8fe0bb;
+    --feat: #F5F5F7; --feat-ink: #1D1D1F; --feat-muted: rgba(0, 0, 0, .6); --feat-line: rgba(0, 0, 0, .12);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+.num, .v { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.lbl { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.tag { font-size: 12px; color: var(--muted); }
+h1, h2 { font-family: var(--f-display); margin: 0; }
+h2 { font-size: 15px; font-weight: 600; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; box-shadow: var(--shadow); min-width: 0; }
+.panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 14px 16px 0; }
+.body { padding: 10px 16px 14px; }
+button {
+  font: 600 13px var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 2px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+}
+button:hover { background: var(--panel-2); }
+button:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb, var(--ink) 35%, transparent); outline-offset: 2px; }
+button.primary { background: var(--process); color: var(--on-process); border-color: transparent; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- Estructura base (celular) ---------- */
+.stage { display: grid; gap: 12px; max-width: 720px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 90px max(16px, env(safe-area-inset-left, 0px)); }
+.pane { display: grid; gap: 12px; min-height: 0; }
+.pane[hidden] { display: none !important; }
+.col { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; }
+
+/* Barra superior: logo, pestañas en píldora, estado */
+.topbar { display: flex; align-items: center; gap: 10px; padding-top: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 15px var(--f-display); margin-right: auto; }
+.logo { width: 36px; height: 36px; border-radius: 2px; background: var(--feat); color: var(--feat-ink); display: grid; place-items: center; font: 800 13px var(--f-display); }
+.tabs { display: flex; gap: 2px; background: var(--panel); border-radius: 2px; padding: 4px; order: 3; width: 100%; overflow-x: auto; }
+.tab { border: 0; background: transparent; padding: 8px 16px; font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; flex: 1 0 auto; justify-content: center; }
+.tab:hover { background: var(--panel-2); }
+.tab[aria-selected="true"] { background: var(--process); color: var(--on-process); }
+.tab .badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 2px; background: var(--panel-2); color: var(--muted); }
+.tab[aria-selected="true"] .badge { background: color-mix(in srgb, var(--on-process) 20%, transparent); color: var(--on-process); }
+.tab .badge.hot { background: var(--alarm); color: #fff; }
+.tab .badge:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 2px; font-size: 12.5px; font-weight: 600; background: var(--panel); color: var(--ink); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--stale); flex: none; }
+.chip.ok .dot { background: var(--ok); }
+.chip.warn .dot { background: var(--warn); }
+.chip.alarm { color: var(--alarm); }
+.chip.alarm .dot { background: var(--alarm); }
+.panel .chip, .kpi .chip { background: var(--panel-2); }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; font: 700 12px var(--f-display); }
+
+.titlebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.titlebar h1 { font-size: 30px; font-weight: 700; line-height: 1.1; margin-right: auto; }
+.livepill { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border-radius: 2px; padding: 7px 14px; font: 600 13px var(--f-data); font-variant-numeric: tabular-nums; }
+.livepill .dot { background: var(--ink); }
+
+/* Barra lateral flotante */
+.rail { position: fixed; z-index: 15; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 4px; padding: 6px; border-radius: 2px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+:root[data-theme="dark"] .rail { background: #262626; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rail { background: #262626; } }
+.rail button { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: rgba(255,255,255,.75); display: grid; place-items: center; position: relative; }
+.rail button[hidden] { display: none; }
+.rail button:hover { background: rgba(255,255,255,.12); color: #fff; }
+.rail button.on { background: rgba(255,255,255,.16); color: #fff; }
+.rail svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.rail .tip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); background: var(--feat); color: var(--feat-ink); font: 600 11.5px var(--f-body); padding: 4px 8px; border-radius: 2px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.rail button:hover .tip, .rail button:focus-visible .tip { opacity: 1; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.kpis .verdict, .kpis .timer { grid-column: 1 / -1; }
+.kpi { padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.kpi .v { font-size: 30px; font-weight: 700; line-height: 1.05; }
+.kpi .v small { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.kpi .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 2px; background: var(--panel-2); color: var(--ink); }
+.feature { background: var(--feat); color: var(--feat-ink); }
+.feature .lbl, .feature .sub, .feature .tag { color: var(--feat-muted); }
+.verdict .big { font: 700 24px/1.15 var(--f-display); }
+.verdict .big::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--stale); margin-right: 10px; vertical-align: 3px; }
+.verdict.ok .big::before { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 30%, transparent); }
+.verdict.warn .big { color: var(--warn); }
+.verdict.warn .big::before { background: var(--warn); }
+.verdict.alarm .big { color: var(--alarm); }
+.verdict.alarm .big::before { background: var(--alarm); }
+.verdict .sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.timer .v.ok { color: var(--ok); }
+.timer .v.warn { color: var(--warn); }
+.timer-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.window { position: relative; height: 8px; background: var(--panel-2); border-radius: 2px; margin-top: 8px; }
+.window .band { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--ok) 30%, transparent); border-radius: 2px; }
+.window .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--process); width: 0; border-radius: 2px; }
+.window .mark { position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
+.window .last { position: absolute; top: -9px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--muted); transform: translateX(-5px); }
+.scale { position: relative; height: 14px; font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+.scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+/* Resumen: medidor y barras */
+.gauge-card { display: flex; flex-direction: column; }
+.gauge-card .body { flex: 1; display: grid; align-content: space-between; }
+.gauge-card svg { width: 100%; height: auto; display: block; pointer-events: none; }
+.gauge-card svg text { fill: var(--feat-muted); }
+.gauge-foot b { display: block; font: 700 15px var(--f-display); }
+.gauge-foot span { font-size: 12px; color: var(--feat-muted); }
+.hist svg { width: 100%; height: auto; display: block; pointer-events: none; }
+.seg { display: inline-flex; background: var(--panel-2); border-radius: 2px; padding: 3px; gap: 2px; }
+.seg span { padding: 3px 10px; border-radius: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.seg span.on { background: var(--panel); color: var(--ink); }
+
+/* Celda */
+.view { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 10px; }
+.view svg, .mini svg, .spark svg { width: 100%; height: auto; display: block; pointer-events: none; }
+#arm { border-radius: 2px; }
+svg text { font-family: var(--f-body); font-size: 11px; fill: var(--muted); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 12px; height: 9px; vertical-align: middle; margin-right: 5px; border-radius: 2px; border: 1px solid var(--card-edge); background: var(--card); }
+.legend b { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--h1); vertical-align: middle; margin-right: 5px; }
+.mini { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.seq { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.seq li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 2px; font-size: 13px; color: var(--muted); background: var(--panel-2); }
+.seq li .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--f-data); border: 1.5px solid var(--line); }
+.seq li.done { color: var(--ink); }
+.seq li.done .n { background: var(--ok); border-color: var(--ok); color: #fff; font-size: 0; }
+.seq li.done .n::after { content: "✓"; font-size: 11px; }
+.seq li.on { color: var(--on-process); background: var(--process); font-weight: 600; }
+.seq li.on .n { background: var(--on-process); border-color: var(--on-process); color: var(--process); }
+.seq li .x { font-size: 12px; font-family: var(--f-data); font-weight: 700; }
+.nodata { color: var(--muted); font-size: 12.5px; }
+
+/* Tablero de tarjetas (kanban) */
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lane { background: var(--panel-2); border-radius: 2px; padding: 10px; display: grid; gap: 8px; align-content: start; min-height: 120px; }
+.lane > header { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: var(--t-texto); padding: 2px 4px; }
+.lane > header .dot { background: var(--muted); }
+.lane.proc > header .dot { background: var(--ink); }
+.lane.done > header .dot { background: var(--ok); }
+.lane > header span:last-child { color: var(--muted); font-weight: 600; }
+.kcard { background: var(--panel); border-radius: 2px; padding: 9px 10px; display: grid; gap: 5px; }
+.kcard .k-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.kcard .k-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.kcard b { font-size: 13px; }
+.k-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.kcard .k-meta { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--muted); }
+.kbar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.kbar i { display: block; height: 100%; background: var(--ink); border-radius: 2px; }
+.kcard.ok .kbar i { background: var(--ok); }
+.kempty { font-size: 12px; color: var(--muted); padding: 6px 4px; }
+
+/* Ciclo de la Pico + comunicación */
+.cycle { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.step { padding: 5px 12px; border-radius: 2px; background: var(--panel-2); font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.step.done { color: var(--ink); }
+.step.on { background: var(--process); color: var(--on-process); }
+.cycle .sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; }
+.step.side.on { background: var(--alarm); color: #fff; }
+.cycle-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.kv { display: grid; gap: 1px; min-width: 0; }
+.kv .v { font-size: 19px; font-weight: 700; white-space: nowrap; }
+.chain { display: flex; align-items: center; }
+.node { flex: none; background: var(--panel-2); border-radius: 2px; padding: 7px 8px; text-align: center; min-width: 64px; }
+.node b { display: block; font: 700 13px var(--f-display); }
+.node span { font-size: 10.5px; color: var(--muted); }
+.link { flex: 1 1 20px; min-width: 20px; display: grid; justify-items: center; gap: 2px; padding: 0 3px; }
+.link i { display: block; height: 3px; width: 100%; background: var(--line); border-radius: 2px; }
+.link.ok i { background: var(--ok); }
+.link.bad i { background: var(--alarm); }
+.link small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.link.bad small { color: var(--alarm); font-weight: 700; }
+
+/* Ejes */
+.axis.alarm { box-shadow: 0 0 0 2px var(--alarm); }
+.axis > header h2 { font-size: 20px; font-weight: 800; }
+.axis > header h2 small { font: 500 16px var(--f-body); color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+.axrow { display: grid; grid-template-columns: 1.15fr 1fr 1.2fr; gap: 8px; align-items: end; }
+.pos { display: flex; align-items: baseline; gap: 4px; }
+.pos .v { font-size: 34px; font-weight: 700; line-height: 1; }
+.pos .u { font-size: 14px; font-weight: 600; color: var(--muted); }
+.metric { min-width: 0; }
+.metric .v { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metric .v small { font: 500 11px var(--f-body); color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.pos-sub { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 16px; margin-top: 6px; }
+.pos-sub b { color: var(--ink); font-weight: 600; font-family: var(--f-data); }
+.v.warn, .val.warn { color: var(--warn) !important; }
+.v.alarm, .val.alarm { color: var(--alarm) !important; }
+.bar { position: relative; height: 7px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.bar > b { position: absolute; inset: 0 auto 0 0; background: var(--process); width: 0; border-radius: 2px; transition: width .3s; }
+.bar.warn > b { background: var(--warn); }
+.bar.alarm > b { background: var(--alarm); }
+.bar > u { position: absolute; top: 0; bottom: 0; width: 2px; background: color-mix(in srgb, var(--warn) 70%, transparent); }
+.bar > u.hi { background: color-mix(in srgb, var(--alarm) 70%, transparent); }
+.spark { margin-top: 8px; }
+.spark svg { height: 64px; border-radius: 2px; }
+.sig { position: relative; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.sig-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sig-leg { display: flex; gap: 12px; font-size: 14px; color: var(--muted); }
+.sig-leg i { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid var(--medido); vertical-align: middle; margin-right: 5px; }
+.sig-leg i.obj { border-top: 2px dashed var(--referencia); }
+.sig svg { display: block; width: 100%; height: 170px; touch-action: none; }
+.sig svg text { font-size: 14px; }
+.sig-tt { position: absolute; top: 24px; z-index: 2; background: var(--feat); color: var(--feat-ink); border-radius: 2px; padding: 6px 9px; font-size: 14px; line-height: 1.35; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+.tel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tel button { padding: 11px 6px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tel button.on { background: var(--process); color: var(--on-process); }
+.ctl-f { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.ctl-f label { display: grid; gap: 3px; }
+.ctl-f input, .ctl-f select { width: 84px; font: 15px var(--f-body); color: var(--ink); background: var(--panel-2); border: 0; border-radius: 2px; padding: 7px 9px; }
+.ctl-f select { width: 190px; }
+#ctlRow .lbl, #ctlRow .tag, #ctlRow .note, #ctlRow button { font-size: 15px; }
+#ctlRow .note:empty { display: none; }
+.leds { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+.led { display: inline-flex; align-items: center; gap: 5px; border-radius: 2px; padding: 3px 9px; font-size: 11px; font-weight: 600; color: var(--muted); background: var(--panel-2); }
+.led::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--stale); }
+.led.on { color: var(--ink); }
+.led.on::before { background: var(--ok); }
+.led.bad { color: var(--alarm); }
+.led.bad::before { background: var(--alarm); }
+
+/* Sistema */
+.rows { display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: 78px minmax(0, 1fr) 64px; gap: 10px; align-items: center; }
+.row .val { text-align: right; font: 700 13.5px var(--f-data); font-variant-numeric: tabular-nums; }
+.row .name { display: grid; line-height: 1.2; }
+.row .name .lbl { color: var(--ink); font-weight: 700; }
+.row .name small { font-size: 10.5px; color: var(--muted); }
+.state-txt { font-size: 12.5px; font-weight: 700; text-align: right; color: var(--ok); }
+.state-txt.alarm { color: var(--alarm); }
+.divider { height: 1px; background: var(--line); }
+.note { font-size: 11px; color: var(--muted); margin: 8px 0 0; }
+.drv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.drv > div { background: var(--panel-2); border-radius: 2px; padding: 7px 10px; display: grid; }
+.drv .state-txt { text-align: left; }
+
+/* Alarmas */
+.alarms { display: flex; flex-direction: column; }
+.alist { padding: 4px 10px 10px; overflow-y: auto; min-height: 0; flex: 1; }
+.al { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 8px 6px; }
+.al + .al { border-top: 1px solid var(--line); }
+.al b { display: block; font-size: 12.5px; font-weight: 700; line-height: 1.25; }
+.al .meta { display: block; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.al button { font-size: 11.5px; padding: 4px 10px; }
+.al.cleared b { color: var(--muted); font-weight: 500; }
+.prio { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font: 800 11px var(--f-data); }
+.prio.p1 { background: var(--alarm); color: #fff; }
+.prio.p2 { background: var(--warn); color: #111; }
+.al.unack .prio { animation: pulso 1.2s ease-in-out infinite; }
+@keyframes pulso { 50% { opacity: .35; } }
+.empty { color: var(--muted); padding: 10px 6px; font-size: 12.5px; }
+
+/* Conexión: ventana flotante */
+.modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.modal[hidden] { display: none; }
+.modal .panel { width: min(640px, 100%); max-height: calc(100dvh - 32px); overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.conn { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: end; }
+.conn label { display: grid; gap: 5px; }
+input { font: 14px var(--f-body); color: var(--ink); background: var(--panel-2); border: 0; border-radius: 2px; padding: 9px 12px; width: 100%; min-width: 0; }
+.err { color: var(--alarm); font-weight: 700; }
+.stale .live { color: var(--stale) !important; }
+
+/* ---------- Computador: cada pestaña en una sola pantalla, sin scroll ---------- */
+@media (min-width: 1000px) {
+  html, body { height: 100%; overflow: hidden; }
+  .stage {
+    position: absolute; left: 0; top: 0; width: 1600px; height: 900px; max-width: none; margin: 0;
+    padding: 0 22px 18px 96px; gap: 14px; grid-template-rows: 64px 50px 112px minmax(0, 1fr); transform-origin: 0 0;
+  }
+  .topbar { padding-top: 0; flex-wrap: nowrap; }
+  .tabs { order: 0; width: auto; position: absolute; left: 50%; transform: translateX(-50%); top: 12px; }
+  .tab { flex: none; }
+  .rail { position: absolute; left: 20px; top: 50%; bottom: auto; transform: translateY(-50%); flex-direction: column; }
+  .rail .tip { left: calc(100% + 10px); bottom: auto; top: 50%; transform: translateY(-50%); }
+  .kpis { grid-template-columns: 1.35fr 1.6fr .85fr .85fr .85fr; gap: 14px; }
+  .kpis .verdict, .kpis .timer { grid-column: auto; }
+  .pane { min-height: 0; gap: 14px; }
+  .col { display: flex; flex-direction: column; gap: 14px; }
+  .col > * { flex: none; }
+  .col > .grow { flex: 1 1 0; min-height: 0; }
+  #paneResumen { grid-template-columns: 400px minmax(0, 1fr) 380px; grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); }
+  #paneResumen .r-gauge { grid-row: 1; grid-column: 1; }
+  #paneResumen .r-hist { grid-row: 1; grid-column: 2; }
+  #paneResumen .r-alarm { grid-row: 1 / 3; grid-column: 3; }
+  #paneResumen .r-comm { grid-row: 2; grid-column: 1; }
+  #paneResumen .r-sys { grid-row: 2; grid-column: 2; }
+  #paneEstacion { grid-template-columns: 540px minmax(0, 1fr) 330px; }
+  .stage.solo-ejes { grid-template-rows: 64px 50px minmax(0, 1fr); }
+  .stage.solo-ejes .kpis { display: none; }
+  #paneEjes { grid-template-rows: minmax(0, 1fr) auto auto; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #paneEjes .ctl-row { grid-column: 1 / -1; }
+  #paneEjes > #axes { display: contents; }
+  #paneEjes .pico-row { grid-column: 1 / -1; }
+  .r-sys .rows { grid-template-columns: 1fr 1fr 1fr; gap: 10px 16px; }
+  .r-sys .row { grid-template-columns: minmax(0, 1fr) 64px; }
+  .r-sys .row .bar { grid-column: 1 / -1; grid-row: 2; }
+  .seq li { padding: 9px 12px; }
+  .r-hist { display: flex; flex-direction: column; }
+  .r-hist .body { flex: 1; min-height: 0; }
+  .r-hist svg { height: 100%; }
+  #paneEjes .axis { display: flex; flex-direction: column; }
+  #paneEjes .axis .body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #paneEjes .sig { flex: 1; min-height: 150px; }
+  #paneEjes .sig svg { flex: 1; height: auto; min-height: 0; }
+  #paneEjes .spark { flex: 1; min-height: 60px; display: flex; flex-direction: column; gap: 4px; }
+  #paneEjes .spark svg { flex: 1; height: auto; min-height: 0; }
+  #paneEstacion .mini svg { max-height: 200px; }
+}
+@media (max-width: 999px) {
+  .stage { position: static; }
+  .alist { max-height: 360px; }
+  #paneEjes > #axes { display: grid; gap: 12px; }
+}
+@media (max-width: 480px) {
+  .cycle-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .board { grid-template-columns: minmax(0, 1fr); }
+  .titlebar h1 { font-size: 26px; }
+  .brand span:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .al.unack .prio { animation: none; box-shadow: 0 0 0 2px var(--ink); }
+  .bar > b { transition: none; }
+}
+/* Instrumento de control: el robot manda la composición. Color solo con significado:
+   azul = interactivo y medido, verde = correcto verificado, naranja = atención, rojo = error, gris = estructura */
+.rail { display: none !important; }
+body { font-size: var(--t-texto); letter-spacing: -.005em; }
+h1 { font-size: var(--t-titulo); font-weight: 600; letter-spacing: -.02em; }
+h2 { font-size: var(--t-seccion); font-weight: 600; letter-spacing: -.01em; }
+.panel { border: 0; border-radius: 14px; box-shadow: none; background: var(--panel); }
+.panel > header { padding: 14px 18px 0; align-items: center; }
+.body { padding: 10px 18px 16px; }
+.lbl { font-size: var(--t-chico); font-weight: 500; color: var(--muted); }
+.tag, .note, .legend, .sub, .alist, .empty, .nodata, .seq li, .scale { font-size: var(--t-chico); color: var(--muted); }
+.seq li { color: var(--ink); }
+.v, .num { font-variant-numeric: tabular-nums; }
+button { font: 600 var(--t-texto) var(--f-body); color: var(--ink); background: var(--panel-2); border: 0; border-radius: 10px; padding: 10px 18px; touch-action: manipulation; }
+button:hover:not(:disabled) { background: color-mix(in srgb, var(--panel-2) 90%, var(--ink)); }
+button:active:not(:disabled) { opacity: .75; }
+button:disabled { color: var(--stale); opacity: 1; }
+button.primary { background: var(--accent); color: #fff; }
+button.primary:hover:not(:disabled) { background: #0066D6; }
+button.primary:disabled { background: var(--panel-2); color: var(--stale); }
+button.activo { background: #FF9500; color: #1D1D1F; }
+#btnSubir:not(:disabled) { background: #FF9500; color: #1D1D1F; }
+.titlebar button { padding: 11px 22px; }
+.ctl-f input, .ctl-f select { font: 500 var(--t-texto) var(--f-body); color: var(--ink); background: var(--panel-2); border: 0; border-radius: 10px; padding: 10px 12px; }
+.ctl-f select { width: 220px; }
+.ctl-f input { width: 96px; }
+.tel { gap: 8px; }
+.tel button { font-size: var(--t-texto); padding: 14px 6px; }
+.tel button.on { background: #FF9500; color: #1D1D1F; }
+/* Barra de arriba */
+.topbar { background: var(--bar); box-shadow: 0 1px 0 var(--line); gap: 28px; }
+.brand { font-size: var(--t-seccion); font-weight: 600; margin-right: 0; gap: 10px; }
+.brand .grupo { font-weight: 400; color: var(--muted); }
+.marca { width: 34px; height: 26px; fill: var(--ink); stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tabs { position: relative; background: var(--panel-2); padding: 3px; border-radius: 10px; }
+.ind { position: absolute; left: 0; top: 3px; bottom: 3px; width: 0; background: var(--panel); border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, .14); pointer-events: none; }
+.tab { position: relative; background: none; border-radius: 8px; color: var(--ink); font-size: var(--t-texto); font-weight: 500; padding: 7px 22px; }
+.tab:hover:not(:disabled) { background: none; }
+.tab[aria-selected="true"] { background: none; color: var(--ink); font-weight: 600; }
+.estados { display: flex; gap: 28px; margin: 0 0 0 auto; }
+.estados div { display: grid; gap: 0; }
+.estados dt { font-size: var(--t-chico); color: var(--muted); }
+.estados dd { margin: 0; font-size: var(--t-texto); font-weight: 600; white-space: nowrap; }
+.estados dd.ok { color: var(--ok); }
+.estados dd.bad { color: var(--alarm); }
+.estados dd.aviso { color: var(--warn); }
+.chip { background: none; padding: 0; font-size: var(--t-texto); font-weight: 600; color: var(--ink); gap: 7px; }
+.livepill { background: none; padding: 0; font: 400 var(--t-texto) var(--f-body); font-variant-numeric: tabular-nums; color: var(--muted); }
+.titlebar .tag { font-size: var(--t-chico); margin-right: 8px; }
+/* Visor de RViz */
+.visor { display: flex; flex-direction: column; overflow: hidden; background: #161618; color: #F5F5F7; }
+.visor > header { padding: 12px 14px 12px 20px; gap: 10px; justify-content: flex-start; }
+.visor h2 { margin-right: 4px; }
+.visor button { background: rgba(255, 255, 255, .12); color: #F5F5F7; font-size: var(--t-chico); padding: 8px 14px; }
+.visor button:hover:not(:disabled) { background: rgba(255, 255, 255, .2); }
+.visor-ayuda { margin-left: auto; color: #C7C7CC; }
+.visor-ayuda:not([hidden]) + #rvizRe { margin-left: 8px; }
+#rvizRe { margin-left: auto; }
+.visor-estado { display: inline-flex; align-items: center; gap: 7px; font-size: var(--t-chico); color: #C7C7CC; }
+.visor-estado .dot { width: 9px; height: 9px; border-radius: 50%; background: #8E8E93; }
+.visor-estado.ok .dot { background: #30D158; }
+.visor-estado.aviso .dot { background: #FF9F0A; }
+.visor-estado.bad .dot { background: #FF453A; }
+.lienzo { position: relative; flex: 1; min-height: 240px; cursor: grab; touch-action: none; display: grid; place-items: center; background: #303030; }   /* el fondo de la vista de RViz */
+.lienzo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+.lienzo-msg { display: grid; gap: 8px; max-width: 620px; padding: 24px; text-align: center; color: #C7C7CC; font-size: var(--t-texto); }
+.lienzo-msg[hidden] { display: none; }
+.lienzo-aviso { position: absolute; left: 14px; bottom: 14px; z-index: 1; padding: 7px 12px; border-radius: 8px; background: rgba(0, 0, 0, .6); color: #FFB340; font-size: var(--t-chico); }
+.lienzo-aviso[hidden] { display: none; }
+.lienzo-msg b { font-size: var(--t-seccion); font-weight: 600; color: #F5F5F7; }
+.lienzo-msg code { font: var(--t-chico) ui-monospace, "DejaVu Sans Mono", monospace; color: #F5F5F7; background: rgba(255, 255, 255, .08); border-radius: 8px; padding: 10px 12px; text-align: left; user-select: all; }
+.visor:fullscreen { border-radius: 0; }
+/* Lado derecho de Resumen */
+.lado { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+.verdict { display: grid; gap: 2px; padding: 16px 18px; }
+.verdict .big { font: 600 var(--t-valor)/1.15 var(--f-display); }
+.verdict .big::before { width: 13px; height: 13px; margin-right: 10px; vertical-align: 4px; box-shadow: none !important; }
+.verdict .sub { font-size: var(--t-texto); color: var(--muted); white-space: normal; -webkit-line-clamp: 3; }
+.proceso { padding: 14px 18px; display: grid; gap: 10px; }
+.filas { display: grid; gap: 0; margin: 0; }
+.filas div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line); }
+.filas div:first-child { border-top: 0; padding-top: 0; }
+.filas dt { font-size: var(--t-texto); color: var(--muted); }
+.filas dd { margin: 0; font-size: var(--t-texto); font-weight: 600; text-align: right; }
+.filas dd small { font-size: var(--t-texto); margin-left: 2px; }
+.filas dd.warn { color: var(--warn); }
+.avance { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.avance i { display: block; height: 100%; width: 0; background: var(--accent); }
+.tray { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.slot { display: grid; gap: 0; padding: 7px 12px; border-radius: 10px; background: var(--panel-2); }
+.slot b { font-size: var(--t-texto); font-weight: 700; }
+.slot span { font-size: var(--t-chico); color: var(--muted); }
+.slot.dest { box-shadow: inset 0 0 0 2px var(--accent); background: none; }
+.slot.dest span { color: var(--accent); font-weight: 600; }
+.slot.proc { background: var(--accent); color: #fff; }
+.slot.proc span { color: #fff; }
+.slot.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.slot.ok span { color: var(--ok); font-weight: 600; }
+.slot.bad { background: color-mix(in srgb, var(--alarm) 14%, transparent); }
+.slot.bad span { color: var(--alarm); font-weight: 600; }
+.lado .alarms { flex: 1 0 130px; display: flex; flex-direction: column; overflow: hidden; }
+.lado .alist { flex: 1; overflow: auto; padding: 8px 18px 14px; }
+#almCount { display: none; }
+.empty { padding: 0; }
+.al, .al b { font-size: var(--t-chico); }
+.al .meta { font-size: var(--t-chico); }
+.al button { font-size: var(--t-chico); padding: 6px 10px; }
+/* Franja inferior */
+.franja { display: flex; align-items: stretch; padding: 14px 4px; }
+.celda { flex: 1 1 0; min-width: 0; display: grid; align-content: start; gap: 3px; padding: 0 16px; border-left: 1px solid var(--line); }
+.celda:first-child { flex: 1.6 1 0; border-left: 0; }
+.celda .v { font-size: var(--t-valor); font-weight: 600; line-height: 1.15; letter-spacing: -.01em; white-space: nowrap; }
+.celda .v small { font-size: var(--t-texto); font-weight: 500; color: var(--muted); margin-left: 3px; }
+.celda .sub { font-size: var(--t-chico); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer-top { display: flex; justify-content: space-between; gap: 8px; }
+.timer-top .tag { font-size: var(--t-chico); }
+.scale { height: 20px; }
+.window { margin-top: 4px; }
+/* Ejes */
+.axis > header h2 { font-size: var(--t-seccion); font-weight: 700; }
+.axis > header h2 small { font-size: var(--t-texto); font-weight: 500; color: var(--muted); margin-left: 8px; }
+.axrow { display: flex; gap: 28px; flex-wrap: wrap; }
+.dato { display: grid; gap: 1px; }
+.pos { align-items: baseline; }
+.pos .v { font-size: var(--t-valor); font-weight: 600; letter-spacing: -.01em; line-height: 1.15; }
+.pos .u { font-size: var(--t-texto); font-weight: 500; }
+.pos-sub { font-size: var(--t-chico); }
+.pos-sub:empty { display: none; }
+.sig-leg { font-size: var(--t-chico); gap: 16px; color: var(--ink); }
+.sig svg text { font-size: var(--t-chico); fill: var(--muted); font-variant-numeric: tabular-nums; }
+.sig-tt { font-size: var(--t-chico); }
+.leds:empty { display: none; }
+.led { font-size: var(--t-chico); }
+/* Estación */
+#trayE .slot { padding: 18px 16px; }
+#paneEstacion .view { flex: 1; min-height: 0; }
+#paneEstacion .view { align-items: center; }
+#arm { aspect-ratio: 400 / 290; width: auto; height: auto; flex: 1 1 0; min-width: 0; max-height: 100%; }
+#pGauge { height: 100%; max-height: 100%; }
+#pila, #hist { display: block; width: 100%; height: 100%; }
+#pila[hidden] { display: none; }
+#pGauge { overflow: visible; }
+.e-seq .seq { gap: 4px; }
+.e-seq .seq li { padding: 5px 10px; }
+.e-comm .chain { gap: 6px; }
+.e-board .board { height: 100%; }
+.e-board .k-tag, .e-board .k-meta { display: none !important; }
+.e-board .kcard { padding: 6px 10px; }
+.e-board .kcard b { white-space: nowrap; }
+.e-board .lane { overflow: hidden; }
+.e-hist #hN { display: none; }
+.e-hist .seg, #paneEstacion h2 { white-space: nowrap; }
+.e-bandeja .slot { align-content: center; }
+#paneEstacion .view { grid-template-columns: minmax(0, 1fr) 84px; gap: 18px; align-items: stretch; }
+#paneEstacion .view { grid-template-rows: minmax(0, 1fr); }
+#paneEstacion #arm { width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; flex: none; }   /* el viewBox lo encoge entero: nunca se corta */
+#paneEstacion #pGauge { min-height: 0; }
+#trayE .slot b { font-size: var(--t-seccion); }
+.board { gap: 12px; }
+.kcard b, .lane header { font-size: var(--t-texto); }
+.k-tag, .k-meta, .kempty { font-size: var(--t-chico); }
+.link small { font-size: var(--t-chico); }
+.node b { font-size: var(--t-chico); }
+.node span { font-size: var(--t-chico); }
+.seg span { font-size: var(--t-chico); }
+/* Hoja de controles */
+#ctlRow { border-radius: 14px 14px 0 0; box-shadow: 0 -8px 28px rgba(0, 0, 0, .1); }
+#hojaAsa { display: flex; align-items: center; gap: 14px; }
+#hojaAsa .tag { margin-left: auto; font-size: var(--t-chico); }
+.chev { display: none; }
+.ctl { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+#ctlRow .note { margin-top: 6px; }
+#ctlRow .note:empty { display: none; }
+/* Una sola escala en toda la página: chico para rótulos y unidades, texto para lo que se lee y se pulsa,
+   sección para títulos de panel, valor para las medidas, título para la pestaña. Solo dos pesos: 400 y 600 */
+.lbl, .tag, .note, .sub, .legend, .scale, .sig-leg, .estados dt, .filas dt, .led, .kcard .k-tag, .kcard .k-meta, .kempty, .seq li .n, .seq li .x, .link small, .node span, .al .meta, .seg span, .pos .u, .celda .v small, .slot span, .visor-estado { font-size: var(--t-chico); font-weight: 400; }
+.filas dt, .estados dd, .filas dd, .chip, .livepill, .tab, button, .seq li, .kcard b, .lane header, .node b, .al b, .slot b, #trayE .slot b, .verdict .sub, .pos-sub { font-size: var(--t-texto); }
+.filas dd, .estados dd, .chip, .slot b, #trayE .slot b, .kcard b, .lane header, .node b, .al b, .tab[aria-selected="true"], button { font-weight: 600; }
+.tab { font-weight: 400; }
+h1, .titlebar h1 { font-weight: 600; font-size: var(--t-titulo); }
+.axis > header h2 small { font-weight: 400; }
+h2, .brand, .axis > header h2, .axis > header h2 small { font-size: var(--t-seccion); }
+h2, .brand, .axis > header h2, .visor h2 { font-weight: 600; }
+.brand .grupo, .axis > header h2 small { font-weight: 400; }
+.pos .v, .celda .v, .verdict .big, .v { font-size: var(--t-valor); font-weight: 600; line-height: 1.15; }
+svg text { font-size: var(--fs, var(--t-chico)); font-weight: 400; }
+@media (max-width: 999px) {
+  .topbar { padding: 10px 0; gap: 12px; }
+  .estados { flex-wrap: wrap; gap: 8px 18px; margin: 0; }
+  .franja { flex-wrap: wrap; row-gap: 14px; }
+  .celda { flex: 1 1 45%; border-left: 0; }
+  .ctl { grid-template-columns: minmax(0, 1fr); }
+  .lienzo { aspect-ratio: 16 / 10; }
+  #ctlRow { border-radius: 14px; }
+}
+@media (min-width: 1000px) {
+  .stage { padding: 0 20px 14px; gap: 12px; grid-template-rows: 64px 58px minmax(0, 1fr); }
+  .topbar { margin: 0 -20px; padding: 0 24px; align-items: center; }
+  .tabs { position: relative; left: auto; top: auto; transform: none; width: auto; order: 0; margin: 0; }
+  .pane { gap: 12px; padding-bottom: var(--hoja, 0px); min-height: 0; }
+  #paneResumen { grid-template-columns: minmax(0, 1fr) 430px; grid-template-rows: minmax(0, 1fr) auto; }
+  #paneResumen .visor { grid-row: 1; grid-column: 1; min-height: 0; }
+  #paneResumen .lado { grid-row: 1 / 3; grid-column: 2; }
+  #paneResumen .franja { grid-row: 2; grid-column: 1; }
+  /* Estación: dos filas alineadas a 12 columnas. Arriba lo que pasa ahora, abajo el contexto */
+  #paneEstacion { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr) 236px auto; }
+  #paneEstacion > .panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #paneEstacion > .panel > .body { flex: 1; min-height: 0; overflow: auto; }
+  .e-celda { grid-area: 1 / 1 / 2 / 7; }
+  .e-bandeja { grid-area: 1 / 7 / 2 / 10; }
+  .e-seq { grid-area: 1 / 10 / 2 / 13; }
+  .e-board { grid-area: 2 / 1 / 3 / 6; }
+  .e-pila { grid-area: 2 / 6 / 3 / 8; }
+  .e-hist { grid-area: 2 / 8 / 3 / 11; }
+  .e-comm { grid-area: 2 / 11 / 3 / 13; }
+  .e-sys { grid-area: 3 / 1 / 4 / 13; }
+  .e-bandeja .tray { height: 100%; grid-auto-rows: 1fr; }
+  .e-celda .body { display: flex; flex-direction: column; overflow: hidden !important; }
+  #paneEjes { grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #ctlRow { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; will-change: transform; }
+  #hojaAsa { position: relative; padding: 16px 24px 12px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #hojaAsa:active { cursor: grabbing; }
+  #hojaAsa::before { content: ""; position: absolute; top: 6px; left: 50%; width: 44px; height: 5px; margin-left: -22px; border-radius: 3px; background: var(--stale); }
+  .chev { display: block; width: 16px; height: 10px; fill: none; stroke: var(--muted); stroke-width: 2; }
+  #hojaCuerpo { padding: 4px 24px 18px; }
+}
+</style>
+
+<div class="modal" id="connPanel" hidden>
+  <section class="panel" role="dialog" aria-label="Conexión">
+    <header><h2>Conexión</h2><span class="lbl" id="connState"></span></header>
+    <div class="body">
+      <form class="conn" id="connForm">
+        <label><span class="lbl">Broker (WebSocket)</span><input id="inUrl" value="wss://broker.hivemq.com:8884/mqtt" autocomplete="off"></label>
+        <label><span class="lbl">Prefijo de topics</span><input id="inPrefix" value="scara" autocomplete="off"></label>
+        <label><span class="lbl">Usuario (opcional)</span><input id="inUser" autocomplete="off"></label>
+        <label><span class="lbl">Clave (opcional)</span><input id="inPass" type="password" autocomplete="off"></label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button type="submit" class="primary">Conectar</button>
+          <button type="button" id="btnServ">Usar servidor</button>
+          <button type="button" id="btnClose">Cerrar</button>
+        </div>
+      </form>
+      <p class="note">Si la página se abre desde el backend (<span class="num">web/backend</span>), se conecta sola al servidor, que ya escucha el broker y guarda el historial. Sin servidor, la página se conecta sola al broker y escucha <span class="num">&lt;prefijo&gt;/estado</span>, <span class="num">&lt;prefijo&gt;/evento</span> y <span class="num">&lt;prefijo&gt;/est1</span>, que publica <span class="num">herramientas/scada_mqtt.py</span>. Solo muestra lo que llega: un dato que no se manda no aparece. Es de solo lectura: no manda comandos al robot.</p>
+    </div>
+  </section>
+</div>
+
+<div class="stage" id="app">
+  <nav class="rail" aria-label="Acciones">
+    <button type="button" id="btnConnToggle" aria-label="Conexión"><svg viewBox="0 0 24 24"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/><path d="M2 9a14.5 14.5 0 0 1 20 0"/></svg><span class="tip">Conexión</span></button>
+    <button type="button" id="btnTheme" aria-label="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span class="tip">Tema claro u oscuro</span></button>
+  </nav>
+
+  <div class="topbar">
+    <div class="brand"><svg class="marca" viewBox="0 0 34 26" aria-hidden="true"><path d="M5 21 15 8l14 6"/><circle cx="5" cy="21" r="3.2"/><circle cx="15" cy="8" r="2.4"/><circle cx="29" cy="14" r="2.4"/></svg><span>SCARA RRP</span><span class="grupo">Grupo 7-G</span></div>
+    <div class="tabs" role="tablist" aria-label="Vistas">
+      <span class="ind" id="tabInd"></span>
+      <button type="button" class="tab" role="tab" data-pane="paneResumen" aria-selected="true">Resumen <span class="badge" id="tabAlm"></span></button>
+      <button type="button" class="tab" role="tab" data-pane="paneEstacion" aria-selected="false">Estación </button>
+      <button type="button" class="tab" role="tab" data-pane="paneEjes" aria-selected="false">Ejes</button>
+    </div>
+    <dl class="estados">
+      <div><dt>Pico</dt><dd id="eqPico">Sin datos</dd></div>
+      <div><dt>ROS 2</dt><dd id="eqRos">Sin datos</dd></div>
+      <div><dt>Telemetría</dt><dd><span class="chip" id="chipConn"><span class="dot"></span><span>Sin conexión</span></span></dd></div>
+      <div><dt>Modo</dt><dd id="eqModo">En espera</dd></div>
+    </dl>
+  </div>
+
+  <div class="titlebar">
+    <h1 id="paneTitle">Resumen</h1>
+    <span class="tag" id="accMsg" style="max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
+    <button type="button" id="btnHome" hidden>Home</button>
+    <button type="button" id="btnTeleop" hidden>Teleop</button>
+    <button type="button" id="btnControl" hidden>Control</button>
+    <button type="button" class="primary" id="btnSeq" hidden>Secuencia</button>
+    <span class="livepill"><span class="dot"></span><span id="age">Sin datos</span></span>
+    <span class="livepill num" id="clock">--:--:--</span>
+  </div>
+
+  <!-- Resumen -->
+  <div class="pane" id="paneResumen" role="tabpanel">
+    <section class="panel visor" id="visor">
+      <header>
+        <h2>Robot en vivo</h2>
+        <span class="visor-estado" id="rvizEstado"><span class="dot"></span><span id="rvizTxt">Conectando</span></span>
+        <span class="lbl visor-ayuda" id="rvizAyuda" hidden>Arrastra para girar, rueda para acercar</span>
+        <button type="button" id="rvizRe">Reconectar</button>
+        <button type="button" id="rvizFull">Pantalla completa</button>
+      </header>
+      <div class="lienzo">
+        <img id="rvizImg" alt="Imagen en vivo de la ventana de RViz del gemelo" hidden>
+        <span class="lienzo-aviso" id="rvizAviso" hidden>Sin datos del robot: el modelo está en reposo, no es su posición real</span>
+        <div class="lienzo-msg" id="rvizMsg">
+          <b id="rvizTit">Conectando con RViz</b>
+          <span id="rvizSub"></span>
+          <code id="rvizCmd" hidden>herramientas/gemelo_visor.sh</code>
+        </div>
+      </div>
+    </section>
+    <aside class="lado">
+      <section class="panel verdict" id="verdict">
+        <span class="lbl">Estado del robot</span>
+        <span class="big" id="verdictTxt">Esperando datos</span>
+        <span class="sub" id="verdictSub"></span>
+      </section>
+      <section class="panel proceso">
+        <h2>Proceso</h2>
+        <dl class="filas">
+          <div><dt>Fase actual</dt><dd id="rFase">Sin datos</dd></div>
+          <div><dt>Vacío de la ventosa</dt><dd id="rVacio">Sin datos</dd></div>
+          <div><dt>Posición de depósito</dt><dd id="rDeposito">Sin datos</dd></div>
+          <div><dt>Tarjetas colocadas</dt><dd id="rColocadas">Sin datos</dd></div>
+          <div><dt>Último ciclo</dt><dd id="kUltimo">Sin datos</dd></div>
+          <div><dt>Ciclos completos</dt><dd id="kCiclos">Sin datos</dd></div>
+        </dl>
+        <div class="avance" aria-hidden="true"><i id="rAvance"></i></div>
+        <div class="tray" id="trayR" role="img" aria-label="Bandeja de cuatro posiciones"><div class="slot" data-s="1"><b>P1</b><span>Sin datos</span></div><div class="slot" data-s="2"><b>P2</b><span>Sin datos</span></div><div class="slot" data-s="3"><b>P3</b><span>Sin datos</span></div><div class="slot" data-s="4"><b>P4</b><span>Sin datos</span></div></div>
+      </section>
+    <section class="panel alarms">
+      <header><h2>Alarmas</h2><button type="button" id="btnAckAll">Reconocer todas</button></header>
+      <div style="padding:2px 16px 0"><span class="lbl" id="almCount"></span></div>
+      <div class="alist" id="almBody"></div>
+    </section>
+    </aside>
+    <section class="panel franja">
+      <div class="celda timer">
+        <div class="timer-top"><span class="lbl">Tiempo del ciclo</span><span class="tag" id="tWin">Sin datos</span></div>
+      <span class="v live" id="tCiclo">Sin datos</span>
+      <div class="window"><span class="band" style="left:33.33%; width:50%"></span><span class="fill" id="winFill"></span><span class="last" id="winLast" hidden></span><span class="mark" id="winMark" hidden></span></div>
+      <div class="scale"><span style="left:0%; transform:none">0</span><span style="left:33.33%">20</span><span style="left:83.33%">50</span><span style="left:100%; transform:translateX(-100%)">60 s</span></div>
+      </div>
+      <div class="celda"><span class="lbl">Posición del hombro · R2</span><span class="v live" id="rpR2">Sin datos</span></div>
+      <div class="celda"><span class="lbl">Posición del codo · R1</span><span class="v live" id="rpR1">Sin datos</span></div>
+      <div class="celda"><span class="lbl">Altura del eje vertical · P</span><span class="v live" id="rpP">Sin datos</span></div>
+    </section>
+  </div>
+
+  <!-- Estación -->
+  <div class="pane" id="paneEstacion" role="tabpanel" hidden>
+    <section class="panel e-celda">
+      <header><h2>Celda de trabajo</h2><span class="tag">Vista superior</span></header>
+      <div class="body">
+        <div class="view">
+          <svg id="arm" viewBox="0 0 400 290" role="img" aria-label="Brazo, pila y bandeja vistos desde arriba"></svg>
+          <svg id="pGauge" viewBox="0 0 76 290" role="img" aria-label="Altura del eje P"></svg>
+        </div>
+        <div class="legend" id="legend"><span><i></i>Tarjeta virgen</span><span><b></b>Agujero H1</span></div>
+      </div>
+    </section>
+    <section class="panel e-bandeja">
+      <header><h2>Bandeja</h2></header>
+      <div class="body"><div class="tray" id="trayE" role="img" aria-label="Bandeja de cuatro posiciones"><div class="slot" data-s="1"><b>P1</b><span>Sin datos</span></div><div class="slot" data-s="2"><b>P2</b><span>Sin datos</span></div><div class="slot" data-s="3"><b>P3</b><span>Sin datos</span></div><div class="slot" data-s="4"><b>P4</b><span>Sin datos</span></div></div></div>
+    </section>
+    <section class="panel e-seq">
+      <header><h2>Secuencia</h2><span class="tag" id="seqTag">Sin datos</span></header>
+      <div class="body">
+        <ol class="seq" id="seq"></ol>
+        <div class="nodata" id="seqNo" hidden>Sin datos de secuencia</div>
+      </div>
+    </section>
+      <section class="panel e-board" id="pBoard">
+        <header><h2>Tarjetas del ciclo</h2><span class="tag">pila → ventosa → bandeja</span></header>
+        <div class="body"><div class="board" id="board"></div><div class="nodata" id="boardNo">Sin datos</div></div>
+      </section>
+    <section class="panel e-pila" id="pMini">
+      <header><h2>Pila en cruz</h2></header>
+      <div class="body"><svg id="pila" hidden viewBox="0 0 160 150" role="img" aria-label="Pila de tarjetas con orientación alternada"></svg><div class="nodata" id="pilaNo">Sin datos</div></div>
+    </section>
+    <section class="panel hist e-hist">
+      <header><h2>Últimos ciclos</h2><span class="seg"><span class="on" id="hN">Sin datos</span><span id="hProm">Sin promedio</span></span></header>
+      <div class="body"><svg id="hist" viewBox="0 0 640 230" role="img" aria-label="Duración de los últimos ciclos"></svg></div>
+    </section>
+    <section class="panel e-comm">
+      <header><h2>Comunicación</h2><span class="tag" id="fmtTag"></span></header>
+      <div class="body">
+        <div class="chain" id="chainRobot" hidden>
+          <div class="node"><b>Pico</b><span>control</span></div>
+          <div class="link" id="lkI2C"><small>I2C</small><i></i><small id="lkI2Ct">Sin datos</small></div>
+          <div class="node"><b>STM32</b><span>protección</span></div>
+          <div class="link" id="lkUart"><small>Wi-Fi</small><i></i><small id="lkUartt">Sin datos</small></div>
+          <div class="node"><b>FC41D</b><span>MQTT</span></div>
+        </div>
+        <div class="chain" style="margin-top:10px">
+          <div class="link" id="lkWeb"><small>Broker</small><i></i><small id="lkWebt">Sin datos</small></div>
+          <div class="node"><b>HMI</b><span>esta página</span></div>
+        </div>
+      </div>
+    </section>
+    <section class="panel r-sys e-sys" hidden>
+      <header><h2>Sistema</h2><span class="tag">Temperatura: aviso 70 °C, alarma 85 °C - 3.3 V: 3.1–3.5 V</span></header>
+      <div class="body">
+        <div class="rows">
+          <div class="row"><span class="name"><span class="lbl">Pico</span><small>RP2040</small></span><div class="bar" id="bTpico"><b></b><u style="left:70%"></u><u class="hi" style="left:85%"></u></div><span class="val live" id="vTpico">Sin datos</span></div>
+          <div class="row"><span class="name"><span class="lbl">STM32</span><small>F030</small></span><div class="bar" id="bTstm"><b></b><u style="left:70%"></u><u class="hi" style="left:85%"></u></div><span class="val live" id="vTstm">Sin datos</span></div>
+          <div class="row"><span class="name"><span class="lbl">3.3 V</span><small>VDDA</small></span><div class="bar" id="bVdda"><b></b><u style="left:77.5%"></u><u class="hi" style="left:87.5%"></u></div><span class="val live" id="vVdda">Sin datos</span></div>
+        </div>
+        <div class="drv" style="margin-top:12px">
+          <div><span class="lbl">Drivers M1 - IFX007T</span><span class="state-txt live" id="drvR1">Sin datos</span></div>
+          <div><span class="lbl">Drivers M2 - IFX007T</span><span class="state-txt live" id="drvR2">Sin datos</span></div>
+          <div><span class="lbl">Drivers M3 - IFX007T</span><span class="state-txt live" id="drvP">Sin datos</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Ejes -->
+  <div class="pane" id="paneEjes" role="tabpanel" hidden>
+    <div id="axes"></div>
+    <section class="panel pico-row" hidden>
+      <header><h2>Ciclo de la Pico</h2><span class="tag" id="cicloTxt">Sin datos</span></header>
+      <div class="body" style="display:flex; gap:24px; align-items:center; flex-wrap:wrap">
+        <div class="cycle" id="cycle">
+          <div class="step" data-s="ARRANQUE">Arranque</div>
+          <div class="step" data-s="ESPERA">Espera</div>
+          <div class="step" data-s="HOME_R1">Home R1</div>
+          <div class="step" data-s="HOME_R2">Home R2</div>
+          <div class="step" data-s="HOME_P">Home P</div>
+          <div class="step" data-s="LISTO">Listo</div>
+          <div class="step" data-s="QUIETO">Quieto</div>
+          <span class="sep"></span>
+          <div class="step side" data-s="FALLA">Falla</div>
+          <div class="step side" data-s="SIN_PICO">Sin Pico</div>
+        </div>
+        <div class="cycle-meta" style="margin:0; flex:1; min-width:300px">
+          <div class="kv"><span class="lbl">En este estado</span><span class="v live" id="enEstado">Sin datos</span></div>
+          <div class="kv"><span class="lbl">Lazo de control</span><span class="v live" id="loopRate">Sin datos</span></div>
+          <div class="kv"><span class="lbl">Contador del lazo</span><span class="v live" id="loopN">Sin datos</span></div>
+          <div class="kv"><span class="lbl">STM32 encendido</span><span class="v live" id="up">Sin datos</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <section class="panel ctl-row" id="ctlRow" hidden>
+      <header id="hojaAsa" role="button" tabindex="0" aria-expanded="false" aria-controls="hojaCuerpo"><h2>Controles del robot</h2><span class="tag" id="ctlActivo"></span><svg class="chev" id="hojaChev" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 8l6-6 6 6"/></svg></header>
+      <div class="body ctl" id="hojaCuerpo">
+        <div>
+          <div class="ctl-f">
+            <label><span class="lbl">Controlador</span><select id="ctlTipo"><option value="implementado">RST implementado</option><option value="incremental">RST incremental</option><option value="posicional">RST posicional</option><option value="enmascarado">RST enmascarado</option></select></label>
+            <label data-c="rst"><span class="lbl">wn</span><input id="cWn" type="number" step="any" value="15"></label>
+            <label data-c="rst"><span class="lbl">zeta</span><input id="cZeta" type="number" step="any" value="0.85"></label>
+            <label data-c="rst"><span class="lbl">polo r</span><input id="cR" type="number" step="any" value="0.5"></label>
+            <label data-c="enm"><span class="lbl">Kp</span><input id="cKp" type="number" step="any" value="5"></label>
+            <label data-c="enm"><span class="lbl">Ti</span><input id="cTi" type="number" step="any" value="0.2"></label>
+            <label data-c="enm"><span class="lbl">Td</span><input id="cTd" type="number" step="any" value="0.01"></label>
+            <button type="button" class="primary" id="btnSubir">Subir y hacer home</button>
+          </div>
+          <p class="note" id="ctlMsg"></p>
+        </div>
+        <div>
+          <span class="lbl">Ir a una coordenada (p2p, mm)</span>
+          <form class="ctl-f" id="irForm" style="margin-top:4px">
+            <label><span class="lbl">X</span><input id="irX" type="number" step="any" value="0" required></label>
+            <label><span class="lbl">Y</span><input id="irY" type="number" step="any" value="200" required></label>
+            <label><span class="lbl">Altura P</span><input id="irP" type="number" step="any" value="30" required></label>
+            <button type="submit" class="primary" id="btnIr">Ir</button>
+          </form>
+          <p class="note" id="irMsg"></p>
+        </div>
+        <div id="telPanel" hidden>
+          <span class="lbl">Teleop: mantén presionado, al soltar se detiene</span>
+          <p class="note" id="mandoEstado">Mando de Xbox: pulsa un botón para conectarlo</p>
+          <div class="tel" style="margin-top:4px">
+            <button type="button" data-k="q">Q: R1 +</button><button type="button" data-k="w">W: R2 +</button><button type="button" data-k="e">E: P +</button>
+            <button type="button" data-k="a">A: R1 −</button><button type="button" data-k="s">S: R2 −</button><button type="button" data-k="d">D: P −</button>
+            <button type="button" data-k="z">Z: Servo −</button><button type="button" data-k="x">X: Servo +</button><button type="button" id="btnBomba" aria-pressed="false">Bomba: apagada</button>
+          </div>
+        </div>
+      </div>
+    </section>
+</div>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js" defer></script>
+<script>
+(() => {
+  "use strict";
+  // ---------- Configuración (ajustar a la mecánica real) ----------
+  const CFG = {
+    ejes: {
+      R1: { nombre: "Codo",       motor: "M1", unidad: "°",  min: -105, max: 112 },
+      R2: { nombre: "Hombro",     motor: "M2", unidad: "°",  min: -85,  max: 90 },
+      P:  { nombre: "Eje vertical", motor: "M3", unidad: "mm", min: 0,    max: 50 },
+    },
+    PILA: [0, 90, 0, 90],          // orientación de las tarjetas 1..4 en la pila (1 = la de arriba)
+    T_MIN: 20, T_MAX: 50, T_ESCALA: 60,   // s: ventana del ciclo de la estación
+    I_SOST: 3.0, I_PICO: 4.5, I_MAX: 5.5,
+    T_AVISO: 70, T_ALARMA: 85,
+    V_MOTOR: 12, VDDA_MIN: 3.1, VDDA_MAX: 3.5,
+    PERIODO_MS: 500, STALE_MS: 2000, HIST: 120, VENTANA_MS: 60000,
+  };
+  const EJES = Object.keys(CFG.ejes);
+  const ORDEN = ["ARRANQUE", "ESPERA", "HOME_R1", "HOME_R2", "HOME_P", "LISTO", "QUIETO"];
+  const CICLO_TXT = {
+    ARRANQUE: "Inicializando", ESPERA: "Esperando el Enter para empezar el home",
+    HOME_R1: "Home de R1", HOME_R2: "Home de R2", HOME_P: "Home de P",
+    LISTO: "En control, ejecutando la estación", QUIETO: "En control, sin objetivos nuevos",
+    FALLA: "Un home falló o el STM32 cortó un eje: hay que reiniciar", SIN_PICO: "El STM32 no recibe datos de la Pico",
+  };
+  // Fases de cada tarjeta (campo est1.fase)
+  const FASES = [
+    ["PILA", "Ir a la pila"], ["BAJAR_PILA", "Bajar P hasta la tarjeta"], ["VACIO", "Activar ventosa"],
+    ["SUBIR_PILA", "Subir con la tarjeta"], ["CORREGIR", "Corregir orientación"], ["BANDEJA", "Ir a su posición en la bandeja"],
+    ["BAJAR_BANDEJA", "Bajar P a la bandeja"], ["SOLTAR", "Soltar la tarjeta"], ["SUBIR_BANDEJA", "Subir y liberar"],
+  ];
+  const EST = { D: "Deshabilitado", H: "Haciendo home", R: "Listo", F: "Falla" };
+  const FALLAS = {
+    sostenida: { txt: "Sobrecorriente sostenida (> 3 A por 500 ms)", prio: 2 },
+    pico:      { txt: "Sobrecorriente de pico (> 4.5 A por 20 ms)", prio: 1 },
+    driver:    { txt: "Falla del driver IFX007T: sobretemperatura o corto", prio: 1 },
+    enlace:    { txt: "El STM32 perdió la Pico: EN apagado", prio: 1 },
+  };
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+  const aGrados = (e, pos) => (e === "P" ? pos : (pos * 180) / Math.PI); // R1/R2 llegan en rad
+  const giroDe = (k) => (k >= 1 && k <= 4 ? -CFG.PILA[k - 1] : 0);
+
+  // ---------- Estado ----------
+  const S = {
+    modo: "off", mqttOk: false,
+    last: null, lastAt: 0, prevLoop: null, loopRate: null, loopQuieto: 0,
+    hist: Object.fromEntries(EJES.map((e) => [e, []])),
+    sen: Object.fromEntries(EJES.map((e) => [e, []])), hover: null,
+    ciclo: null, cicloDesde: 0, alarmas: [], seq: 0,
+    tiempos: [], ultimoVisto: null, est: null,
+    view: Object.fromEntries(EJES.map((e) => [e, { pos: 0 }])),
+  };
+
+  // ---------- Construcción ----------
+  $("seq").innerHTML = FASES.map(([k, t], i) => `<li data-f="${k}"><span class="n">${i + 1}</span><span>${t}</span><span class="x"></span></li>`).join("");
+  $("axes").innerHTML = EJES.map((e) => {
+    const c = CFG.ejes[e];
+    return `<section class="panel axis grow" id="ax${e}">
+      <header><h2>${e}<small>${c.nombre}</small></h2><span class="chip" id="st${e}" hidden><span class="dot"></span><span>Sin datos</span></span></header>
+      <div class="body">
+        <div class="axrow">
+          <div class="dato"><span class="lbl">Posición actual</span><div class="pos"><span class="v live" id="pos${e}">Sin datos</span><span class="u">${c.unidad}</span></div></div>
+          <div class="dato" id="objW${e}" hidden><span class="lbl">Referencia</span><div class="pos"><span class="v live" id="obj${e}">Sin datos</span></div></div>
+          <div class="dato" id="errW${e}" hidden><span class="lbl">Error</span><div class="pos"><span class="v live" id="err${e}">Sin datos</span></div></div>
+          <div class="metric" hidden><span class="lbl">Corriente</span><div class="v live" id="i${e}">Sin datos</div></div>
+          <div class="metric" hidden><span class="lbl">Voltaje al motor</span><div class="v live" id="v${e}">Sin datos</div></div>
+        </div>
+        <div class="pos-sub"><span hidden>Pico <b class="live" id="est${e}">Sin datos</b></span></div>
+        <div class="sig" id="sig${e}">
+          <div class="sig-top"><span class="lbl">Último minuto, en ${c.unidad}</span><span class="sig-leg"><span><i></i>Medido</span><span id="legO${e}" hidden><i class="obj"></i>Referencia</span></span></div>
+          <svg id="sg${e}" role="img" aria-label="Posición medida y setpoint de ${e} en el último minuto"></svg>
+          <div class="sig-tt" id="tt${e}" hidden></div>
+        </div>
+        <div class="bar" id="ib${e}" hidden><b></b><u style="left:${(CFG.I_SOST / CFG.I_MAX) * 100}%"></u><u class="hi" style="left:${(CFG.I_PICO / CFG.I_MAX) * 100}%"></u></div>
+        <div class="spark" hidden><span class="lbl">Corriente reciente</span><svg viewBox="0 0 300 50" preserveAspectRatio="none" id="sp${e}"></svg></div>
+        <div class="leds">
+          <span class="led" id="en${e}" hidden>EN</span><span class="led" id="lh${e}" hidden>Lím. home</span>
+          <span class="led" id="le${e}" hidden>Lím. fin</span><span class="led" id="fl${e}" hidden>Sin falla</span>
+        </div>
+      </div>
+    </section>`;
+  }).join("");
+
+  // ---------- Utilidades ----------
+  const fmt = (v, d = 1) => (v == null || Number.isNaN(+v) ? "Sin datos" : (+v).toFixed(d));
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const pct = (v, a, b) => clamp(((v - a) / (b - a)) * 100, 0, 100);
+  const hhmmss = (t) => new Date(t).toLocaleTimeString("es", { hour12: false });
+  const dur = (ms) => { const s = Math.floor(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
+  const ver = (el, on) => { el.hidden = !on; }; // lo que no llega no se muestra
+  function setCls(el, cls, on) { el.classList.toggle(cls, !!on); }
+  function level(el, v, warnAt, alarmAt) { setCls(el, "warn", v >= warnAt && v < alarmAt); setCls(el, "alarm", v >= alarmAt); }
+  // Solo reescribe el DOM si cambió: así no se reemplazan nodos bajo el cursor en cada dato (scroll fluido)
+  function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
+  function chip(el, kind, txt) { el.className = "chip " + (kind || ""); el.lastElementChild.textContent = txt; }
+  const ejeDe = (d, e) => (Array.isArray(d.ejes) ? d.ejes.find((a) => a && a.n === e) : null);
+  const enVentana = (t) => t >= CFG.T_MIN && t <= CFG.T_MAX;
+  const faseIdx = (f) => FASES.findIndex((x) => x[0] === f);
+
+  // ---------- Alarmas ----------
+  function alarma(clave, eje, tipo, valor, prio) {
+    const viva = S.alarmas.find((a) => a.clave === clave && a.estado !== "normal");
+    if (viva) { if (valor != null) viva.valor = valor; return; }
+    S.alarmas.unshift({ id: ++S.seq, clave, eje, tipo, valor, prio, t: Date.now(), ack: false, estado: "activa" });
+    S.alarmas = S.alarmas.slice(0, 50);
+  }
+  function normalizar(prefijo) { S.alarmas.forEach((a) => { if (a.clave.startsWith(prefijo) && a.estado === "activa") a.estado = "normal"; }); }
+  function renderAlarmas() {
+    const body = $("almBody");
+    const activas = S.alarmas.filter((a) => a.estado === "activa").length;
+    const badge = $("tabAlm"); badge.textContent = activas || ""; setCls(badge, "hot", activas > 0);
+    $("almCount").textContent = `${activas} activas - ${S.alarmas.filter((a) => !a.ack).length} sin reconocer`;
+    if (!S.alarmas.length) { setHTML(body, `<div class="empty">No hay alarmas desde que se abrió la página.</div>`); return; }
+    setHTML(body, S.alarmas.map((a) => `<div class="al ${a.ack ? "" : "unack"} ${a.estado === "normal" ? "cleared" : ""}">
+      <span class="prio p${a.prio}">${a.prio}</span>
+      <span><b>${a.tipo}</b><span class="meta">${hhmmss(a.t)} - ${a.eje}${a.valor ? " - " + a.valor : ""} - ${a.estado === "activa" ? "activa" : "normalizada"}${a.ack ? " - reconocida" : ""}</span></span>
+      ${a.ack ? "<span></span>" : `<button type="button" data-ack="${a.id}">Reconocer</button>`}</div>`).join(""));
+  }
+  $("almBody").addEventListener("click", (ev) => {
+    const a = S.alarmas.find((x) => x.id === +ev.target.dataset.ack); if (!a) return;
+    a.ack = true; renderAlarmas(); renderResumen();
+  });
+  $("btnAckAll").addEventListener("click", () => { S.alarmas.forEach((a) => (a.ack = true)); renderAlarmas(); renderResumen(); });
+
+  // ---------- Entrada de datos: scara/estado y scara/evento ----------
+  function onEstado(d) {
+    if (!d || typeof d !== "object" || !Array.isArray(d.ejes)) return;
+    const now = Date.now();
+    if (S.prevLoop && typeof d.loop === "number") {
+      const dt = (now - S.prevLoop.t) / 1000, dn = d.loop - S.prevLoop.n;
+      if (dt > 0.2 && dn >= 0) S.loopRate = dn / dt;
+      S.loopQuieto = dn === 0 ? S.loopQuieto + 1 : 0;
+    }
+    S.prevLoop = typeof d.loop === "number" ? { t: now, n: d.loop } : null;
+    S.last = d; S.lastAt = now;
+    if (d.ciclo !== S.ciclo) { S.ciclo = d.ciclo; S.cicloDesde = now; }
+    EJES.forEach((e) => {
+      const a = ejeDe(d, e); if (!a) return;
+      const sn = S.sen[e]; sn.push({ t: now, m: aGrados(e, +a.pos || 0), o: a.obj == null ? null : aGrados(e, +a.obj) });
+      while (sn.length && now - sn[0].t > CFG.VENTANA_MS) sn.shift();
+      if (a.i != null) { const h = S.hist[e]; h.push(+a.i); if (h.length > CFG.HIST) h.shift(); }
+      const f = a.falla || "ninguna";
+      if (FALLAS[f]) alarma(`${e}:${f}`, e, FALLAS[f].txt, a.i != null ? `${fmt(a.i, 2)} A` : null, FALLAS[f].prio);
+      else normalizar(`${e}:`);
+    });
+    const t = d.temp || {};
+    [["pico", "Pico"], ["stm32", "STM32"]].forEach(([k, n]) => {
+      const v = t[k]; if (v == null) return;
+      if (v >= CFG.T_ALARMA) alarma(`T:${k}`, "Sistema", `Temperatura alta en ${n}`, `${fmt(v)} °C`, 1);
+      else if (v >= CFG.T_AVISO) alarma(`T:${k}`, "Sistema", `Temperatura elevada en ${n}`, `${fmt(v)} °C`, 2);
+      else normalizar(`T:${k}`);
+    });
+    if (d.pico_ok === false || d.ciclo === "SIN_PICO") alarma("pico", "todos", "La Pico no responde por I2C", null, 1); else normalizar("pico");
+    const enControl = /^(HOME_|LISTO|QUIETO)/.test(d.ciclo || "");
+    if (enControl && d.pico_ok !== false && S.loopQuieto >= 3) alarma("loop", "todos", "El lazo de control de la Pico dejó de avanzar", `loop ${d.loop}`, 1); else normalizar("loop");
+    if (d.vdda != null && (d.vdda < CFG.VDDA_MIN || d.vdda > CFG.VDDA_MAX)) alarma("vdda", "Sistema", "Alimentación de 3.3 V fuera de rango", `${fmt(d.vdda, 2)} V`, 2); else normalizar("vdda");
+    procesarEst1(d.est1 ?? S.est1msg);
+    render();
+  }
+  // est1 llega en su propio topic (lo publica el PC con ROS 2); también se acepta dentro de scara/estado
+  function onEst1(st) {
+    if (!st || typeof st !== "object") return;
+    S.est1msg = st; procesarEst1(st);
+    if (S.last) render(); else renderEstacion(st);
+  }
+  function procesarEst1(st) {
+    if (st && typeof st.t_ultimo === "number" && st.t_ultimo > 0 && st.t_ultimo !== S.ultimoVisto) {
+      S.tiempos.push(st.t_ultimo); if (S.tiempos.length > 50) S.tiempos.shift();
+      if (!enVentana(st.t_ultimo)) alarma("tciclo", "E1", `Ciclo fuera de la ventana ${CFG.T_MIN}–${CFG.T_MAX} s`, `${fmt(st.t_ultimo)} s`, 2);
+      else normalizar("tciclo");
+      S.ultimoVisto = st.t_ultimo;
+    }
+    if (st && typeof st.t_ciclo === "number" && st.t_ciclo > CFG.T_MAX && faseIdx(st.fase) >= 0)
+      alarma("tciclo", "E1", `Ciclo pasado de ${CFG.T_MAX} s`, `${fmt(st.t_ciclo)} s`, 2);
+  }
+  function onEvento(ev) {
+    if (!ev || !ev.eje || !ev.falla) return;
+    if (ev.falla === "ninguna") normalizar(`${ev.eje}:`);
+    else { const info = FALLAS[ev.falla] || { txt: `Falla: ${ev.falla}`, prio: 1 };
+      alarma(`${ev.eje}:${ev.falla}`, ev.eje, info.txt, ev.i != null ? `${fmt(ev.i, 2)} A` : null, info.prio); }
+    renderAlarmas(); renderResumen();
+  }
+
+  // ---------- Render ----------
+  function render() {
+    const d = S.last; if (!d) return;
+    const conStm = d.temp != null || d.vdda != null;
+    ver(document.querySelector(".r-sys"), conStm); ver($("chainRobot"), conStm);
+    ver(document.querySelector(".pico-row"), d.ciclo != null);
+    const cur = ORDEN.indexOf(d.ciclo);
+    document.querySelectorAll("#cycle .step").forEach((el) => {
+      const i = ORDEN.indexOf(el.dataset.s);
+      setCls(el, "on", el.dataset.s === d.ciclo); setCls(el, "done", cur >= 0 && i >= 0 && i < cur);
+    });
+    $("cicloTxt").textContent = CICLO_TXT[d.ciclo] || d.ciclo || "Sin datos";
+    $("loopRate").textContent = S.loopRate == null ? "Sin datos" : S.loopQuieto >= 3 ? "detenido" : `${fmt(S.loopRate, 0)} ciclos/s`;
+    $("loopN").textContent = d.loop == null ? "Sin datos" : d.loop.toLocaleString("es");
+    $("up").textContent = d.up == null ? "Sin datos" : dur(d.up * 1000);
+    $("fmtTag").textContent = d.v != null ? `formato v${d.v}` : "";
+    const t = d.temp || {};
+    [["pico", "Tpico"], ["stm32", "Tstm"]].forEach(([k, id]) => {
+      const v = t[k], bar = $("b" + id), val = $("v" + id);
+      bar.firstElementChild.style.width = v == null ? "0" : pct(v, 0, 100) + "%";
+      val.textContent = v == null ? "Sin datos" : `${fmt(v)} °C`;
+      level(bar, v ?? 0, CFG.T_AVISO, CFG.T_ALARMA); level(val, v ?? 0, CFG.T_AVISO, CFG.T_ALARMA);
+    });
+    const vb = $("bVdda"), vv = $("vVdda"), malV = d.vdda != null && (d.vdda < CFG.VDDA_MIN || d.vdda > CFG.VDDA_MAX);
+    vb.firstElementChild.style.width = d.vdda == null ? "0" : pct(d.vdda, 0, 4) + "%";
+    vv.textContent = d.vdda == null ? "Sin datos" : `${fmt(d.vdda, 2)} V`;
+    setCls(vb, "warn", malV); setCls(vv, "warn", malV);
+    EJES.forEach((e) => {
+      const f = ejeDe(d, e)?.falla, el = $("drv" + e);
+      el.textContent = f === "driver" ? "Falla" : f == null ? "Sin datos" : "OK"; setCls(el, "alarm", f === "driver");
+    });
+    EJES.forEach((e) => {
+      const a = ejeDe(d, e), c = CFG.ejes[e]; if (!a) return;
+      const f = a.falla || "ninguna", falla = f !== "ninguna", i = +a.i || 0, pos = aGrados(e, +a.pos || 0);
+      $("pos" + e).textContent = fmt(pos, 1);
+      $("rp" + e).textContent = `${fmt(pos, 1)} ${c.unidad}`;
+      $("est" + e).textContent = EST[a.est] || a.est || "Sin datos";
+      const iv = $("i" + e); setHTML(iv, `${fmt(i, 2)}<small>A</small>`); level(iv, i, CFG.I_SOST, CFG.I_PICO);
+      const ib = $("ib" + e); ib.firstElementChild.style.width = pct(i, 0, CFG.I_MAX) + "%"; level(ib, i, CFG.I_SOST, CFG.I_PICO);
+      const u = +a.u || 0;
+      setHTML($("v" + e), `${fmt(Math.abs(u), 1)}<small>V - ${u > 0.05 ? "sentido +" : u < -0.05 ? "sentido −" : "parado"}</small>`);
+      sparkline($("sp" + e), S.hist[e]);
+      setCls($("en" + e), "on", a.en); $("en" + e).textContent = a.en ? "EN activo" : "EN apagado";
+      const lim = a.lim || [];
+      setCls($("lh" + e), "on", lim[0]); setCls($("le" + e), "on", lim[1]);
+      const fl = $("fl" + e); setCls(fl, "bad", falla); fl.textContent = falla ? "Falla: " + f : "Sin falla";
+      const mal = falla || a.est === "F"; setCls($("ax" + e), "alarm", mal);
+      chip($("st" + e), mal ? "alarm" : a.en ? "ok" : "", mal ? "Falla" : a.en === false ? "EN apagado" : Math.abs(u) > 0.3 ? "Moviendo" : (EST[a.est] || "Sin datos"));
+      ver($("i" + e).parentElement, a.i != null); ver(ib, a.i != null); ver($("sp" + e).parentElement, a.i != null);
+      ver($("v" + e).parentElement, a.u != null); ver($("est" + e).parentElement, a.est != null);
+      ver($("en" + e), a.en != null); ver($("lh" + e), a.lim != null); ver($("le" + e), a.lim != null); ver(fl, a.falla != null);
+      ver($("st" + e), a.en != null || a.est != null || a.falla != null);
+      ver($("objW" + e), a.obj != null); ver($("errW" + e), a.obj != null); ver($("legO" + e), a.obj != null);
+      if (a.obj != null) { $("obj" + e).textContent = `${fmt(aGrados(e, +a.obj), 1)} ${c.unidad}`; $("err" + e).textContent = `${fmt(aGrados(e, +a.obj) - pos, 1)} ${c.unidad}`; }
+      drawSenal(e);
+      S.view[e].tpos = pos;
+    });
+    renderEstacion(d.est1 ?? S.est1msg);
+    renderAlarmas(); renderResumen(); tick();
+  }
+
+  function renderEstacion(st) {
+    const has = !!(st && typeof st === "object" && st.fase);
+    ver($("board"), has); ver($("boardNo"), !has); ver($("pila"), has); ver($("pilaNo"), !has); ver($("legend"), has);
+    $("seqNo").hidden = has; $("seq").hidden = !has;
+    const k = has ? st.tarjeta : null, fase = has ? st.fase : null, fi = faseIdx(fase);
+    document.querySelectorAll("#seq li").forEach((li, i) => {
+      setCls(li, "on", i === fi); setCls(li, "done", fi >= 0 && i < fi);
+      li.querySelector(".x").textContent = li.dataset.f === "CORREGIR" && k ? (giroDe(k) === 0 ? "0°" : `${giroDe(k)}°`) : "";
+    });
+    $("seqTag").textContent = !has ? "sin datos" : fase === "ESPERA_PILA" ? "esperando pila nueva" : k ? `tarjeta ${k} de 4` : "Sin datos";
+    const tc = has && typeof st.t_ciclo === "number" ? st.t_ciclo : null, tu = has && typeof st.t_ultimo === "number" && st.t_ultimo > 0 ? st.t_ultimo : null;
+    const corriendo = fi >= 0;
+    const tv = $("tCiclo");
+    setHTML(tv, tc == null ? "Sin datos" : `${fmt(tc)}<small>s</small>`);
+    tv.className = "v live " + (tc == null || !corriendo ? "" : tc > CFG.T_MAX ? "warn" : tc >= CFG.T_MIN ? "ok" : "");
+    $("winFill").style.width = tc == null ? "0" : pct(tc, 0, CFG.T_ESCALA) + "%";
+    const mk = $("winMark"); mk.hidden = tc == null; if (tc != null) mk.style.left = pct(tc, 0, CFG.T_ESCALA) + "%";
+    const lt = $("winLast"); lt.hidden = tu == null; if (tu != null) lt.style.left = pct(tu, 0, CFG.T_ESCALA) + "%";
+    $("tWin").textContent = !has ? "sin datos de la estación" : corriendo ? "ciclo en curso" : "entre ciclos - ▼ último";
+    setHTML($("kUltimo"), tu == null ? "Sin datos" : `${fmt(tu)}<small>s</small>`);
+    $("kUltimo").className = tu == null || enVentana(tu) ? "" : "warn";
+    const n = has && typeof st.ciclos === "number" ? st.ciclos : null;
+    $("kCiclos").textContent = n == null ? "Sin datos" : n;
+    S.est = st && typeof st === "object" ? st : null; // puede traer solo la ventosa
+    const conFase = has ? st : null;
+    drawPila(conFase); pintarBandejas(conFase); drawHist(); drawBoard(conFase);
+  }
+
+  // ---------- Barras de los últimos ciclos ----------
+  function drawHist() {
+    const svg = $("hist"), W = svg.clientWidth || 640, H = svg.clientHeight || 230, L = 44, B = 12, top = 14, n = 14, T = CFG.T_ESCALA, data = S.tiempos.slice(-n);
+    const y = (s) => top + (1 - clamp(s, 0, T) / T) * (H - B - top);
+    const slot = (W - L) / n, bw = slot * 0.6;
+    let out = `<defs><pattern id="rayas" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="var(--panel-2)"/><rect width="2.5" height="7" fill="var(--muted)" opacity=".4"/></pattern></defs>
+      <rect x="${L}" y="${y(CFG.T_MAX)}" width="${W - L}" height="${y(CFG.T_MIN) - y(CFG.T_MAX)}" fill="var(--ok)" opacity=".08"/>`;
+    [0, CFG.T_MIN, CFG.T_MAX, T].forEach((s) => {
+      out += `<line x1="${L}" x2="${W}" y1="${y(s)}" y2="${y(s)}" stroke="var(--line)" ${s === CFG.T_MIN || s === CFG.T_MAX ? 'stroke-dasharray="4 4"' : ""}/><text x="0" y="${y(s) + 4}">${s} s</text>`;
+    });
+    if (!data.length) out += `<text x="${(W + L) / 2}" y="${H / 2}" text-anchor="middle">Todavía no termina ningún ciclo</text>`;
+    data.forEach((v, i) => {
+      const x = L + slot * (n - data.length + i) + (slot - bw) / 2, ult = i === data.length - 1, ok = enVentana(v);
+      out += `<rect x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(y(0) - y(v)).toFixed(1)}" rx="${(bw / 2).toFixed(1)}" fill="${!ok ? "var(--warn)" : ult ? "var(--process)" : "url(#rayas)"}"/>`;
+      if (ult || !ok) out += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y(v) - 6).toFixed(1)}" text-anchor="middle" style="fill:var(--ink)">${fmt(v)}</text>`;
+    });
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); setHTML(svg, out);
+    $("hN").textContent = `${data.length} ciclos`;
+    $("hProm").textContent = data.length ? `prom. ${fmt(data.reduce((a, b) => a + b, 0) / data.length)} s` : "Sin promedio";
+  }
+  // Bandeja 2×2 y proceso en Resumen. Una posición solo sale colocada si lo confirma est1 (colocadas)
+  function pintarBandejas(st) {
+    const c = conteo(st), k = st && st.tarjeta, fi = st ? faseIdx(st.fase) : -1, falla = S.alarmas.some((a) => a.estado === "activa" && a.prio === 1);
+    const estado = (s) => {
+      if (!st) return ["", "Sin datos"];
+      if (s <= c.colocadas) return ["ok", "Colocada"];
+      if (k !== s || fi < 0) return ["", "Vacía"];
+      if (falla) return ["bad", "Error"];
+      return fi >= 5 ? ["proc", "En proceso"] : ["dest", "Destino"];
+    };
+    document.querySelectorAll(".tray .slot").forEach((el) => {
+      const [cls, txt] = estado(+el.dataset.s); el.className = "slot " + cls; el.lastElementChild.textContent = txt;
+    });
+    const vacio = S.est && typeof S.est.vacio === "boolean" ? S.est.vacio : null;
+    $("rFase").textContent = !st ? "Sin datos" : fi >= 0 ? FASES[fi][1] : st.fase === "ESPERA_PILA" ? "Esperando pila" : st.fase;
+    $("rVacio").textContent = vacio == null ? "Sin datos" : vacio ? "Activado" : "Apagado";
+    $("rDeposito").textContent = !st ? "Sin datos" : k && fi >= 0 && c.colocadas < k ? `P${k}` : "Pendiente de confirmación";
+    $("rColocadas").textContent = !st ? "Sin datos" : `${c.colocadas} de 4`;
+    $("rAvance").style.width = (st ? ((c.colocadas + (k > c.colocadas && fi >= 0 ? (fi + 1) / FASES.length : 0)) / 4) * 100 : 0) + "%";
+  }
+  // Tablero de tarjetas: en pila → en la ventosa → en la bandeja
+  function drawBoard(st) {
+    const c = conteo(st), k = st && st.tarjeta, fi = st ? faseIdx(st.fase) : -1;
+    const corr = (i) => `Corrección ${giroDe(i) === 0 ? "ninguna" : giroDe(i) + "°"}`;
+    const card = (i, extra, cls = "") => `<div class="kcard ${cls}"><div class="k-top"><b>Tarjeta ${i}</b><span class="k-tag">pila a ${CFG.PILA[i - 1]}°</span></div>${extra}</div>`;
+    const L = { pila: [], proc: [], band: [] };
+    for (let i = 1; i <= 4; i++) {
+      if (i <= c.colocadas) L.band.push(card(i, `<div class="kbar"><i style="width:100%"></i></div><div class="k-meta"><span>Posición ${i}</span><span>H1 ✓</span></div>`, "ok"));
+      else if (i > c.recogidas) L.pila.push(card(i, `<div class="k-meta"><span>${corr(i)}</span><span>${st && i === c.recogidas + 1 && fi >= 0 ? "va ahora" : ""}</span></div>`));
+      else L.proc.push(card(i, `<div class="kbar"><i style="width:${fi >= 0 ? pct(fi + 1, 0, FASES.length) : 50}%"></i></div><div class="k-meta"><span>${fi >= 0 ? FASES[fi][1] : "En la ventosa"}</span><span>${fi >= 0 ? `${fi + 1}/${FASES.length}` : ""}</span></div><div class="k-meta"><span>${corr(i)}</span></div>`));
+    }
+    const lane = (cls, t, arr) => `<div class="lane ${cls}"><header><span class="dot"></span><span>${t}</span><span>${arr.length}</span></header>${arr.join("") || '<div class="kempty">Vacía</div>'}</div>`;
+    setHTML($("board"), lane("", "En pila", L.pila) + lane("proc", "En la ventosa", L.proc) + lane("done", "En bandeja", L.band));
+  }
+
+  // Señal de cada eje: medido (línea continua) contra setpoint (escalones punteados), mismo eje y mismas unidades
+  function drawSenal(e) {
+    const svg = $("sg" + e), W = svg.clientWidth, H = svg.clientHeight; if (!W || !H) return; // pestaña oculta
+    const u = CFG.ejes[e].unidad, data = S.sen[e], L = 52, R = 10, T = 10, B = 26, now = data.length ? data[data.length - 1].t : Date.now();
+    const vals = data.flatMap((p) => (p.o == null ? [p.m] : [p.m, p.o]));
+    let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
+    const falta = Math.max(0, 10 - (hi - lo)) / 2; lo -= falta; hi += falta;
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const crudo = (hi - lo) / 5, pot = 10 ** Math.floor(Math.log10(crudo)), paso = [1, 2, 5, 10].map((m) => m * pot).find((m) => m >= crudo);
+    const marcas = []; for (let v = Math.ceil(lo / paso) * paso; v <= hi; v += paso) marcas.push(v);
+    const x = (t) => L + (1 - (now - t) / CFG.VENTANA_MS) * (W - L - R), y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+    let out = "";
+    marcas.forEach((v) => { out += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)"/><text x="${L - 5}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end">${fmt(v, 0)}</text>`; });
+    [[60, "-60 s", "start"], [30, "-30 s", "middle"], [0, "ahora", "end"]].forEach(([s, t, a]) => { out += `<text x="${x(now - s * 1000).toFixed(1)}" y="${H - 4}" text-anchor="${a}">${t}</text>`; });
+    let obj = "", prev = null;
+    data.forEach((p) => { if (p.o == null) { prev = null; return; }
+      obj += prev == null ? `M${x(p.t).toFixed(1)} ${y(p.o).toFixed(1)}` : `H${x(p.t).toFixed(1)}V${y(p.o).toFixed(1)}`; prev = p.o; });
+    if (obj) out += `<path d="${obj}" fill="none" stroke="var(--referencia)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+    if (data.length) {
+      out += `<polyline points="${data.map((p) => `${x(p.t).toFixed(1)},${y(p.m).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--medido)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`;
+      const u0 = data[data.length - 1]; out += `<circle cx="${x(u0.t).toFixed(1)}" cy="${y(u0.m).toFixed(1)}" r="4" fill="var(--medido)" stroke="var(--panel)" stroke-width="2"/>`;
+    } else out += `<text x="${(W + L) / 2}" y="${H / 2}" text-anchor="middle">Sin datos</text>`;
+    const tt = $("tt" + e), hv = S.hover && S.hover.e === e && data.length ? data.reduce((a, b) => (Math.abs(x(b.t) - S.hover.x) < Math.abs(x(a.t) - S.hover.x) ? b : a)) : null;
+    tt.hidden = !hv;
+    if (hv) {
+      const hx = x(hv.t);
+      out += `<line x1="${hx.toFixed(1)}" x2="${hx.toFixed(1)}" y1="${T}" y2="${H - B}" stroke="var(--muted)"/><circle cx="${hx.toFixed(1)}" cy="${y(hv.m).toFixed(1)}" r="4" fill="var(--process)" stroke="var(--panel)" stroke-width="2"/>`;
+      tt.innerHTML = `hace ${fmt((now - hv.t) / 1000, 1)} s<br>Medido ${fmt(hv.m, 1)} ${u}${hv.o == null ? "" : `<br>Referencia ${fmt(hv.o, 1)} ${u}<br>Error ${fmt(hv.o - hv.m, 1)} ${u}`}`;
+      tt.style.left = (hx > W / 2 ? hx - tt.offsetWidth - 10 : hx + 10).toFixed(1) + "px";
+    }
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); setHTML(svg, out);
+  }
+
+  function sparkline(svg, h) {
+    const W = 300, H = 50, max = CFG.I_MAX, n = CFG.HIST;
+    const y = (v) => H - 2 - (clamp(v, 0, max) / max) * (H - 4);
+    const x = (i) => (i / (n - 1)) * W, off = n - h.length;
+    const pts = h.map((v, i) => `${x(i + off).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    setHTML(svg, `<rect x="0" y="0" width="${W}" height="${H}" fill="var(--well)"/>
+      <line x1="0" x2="${W}" y1="${y(CFG.I_SOST)}" y2="${y(CFG.I_SOST)}" stroke="var(--warn)" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+      <line x1="0" x2="${W}" y1="${y(CFG.I_PICO)}" y2="${y(CFG.I_PICO)}" stroke="var(--alarm)" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+      ${h.length ? `<polygon points="${x(off)},${H} ${pts} ${x(n - 1)},${H}" fill="var(--process-soft)" opacity=".5"/>
+      <polyline points="${pts}" fill="none" stroke="var(--process)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <circle cx="${x(n - 1)}" cy="${y(h[h.length - 1])}" r="3" fill="var(--process)"/>` : ""}`);
+  }
+
+  function renderResumen() {
+    const now = Date.now(), d = S.last, age = now - S.lastAt, stale = !d || age > CFG.STALE_MS;
+    setCls($("app"), "stale", stale && !!d);
+    $("age").textContent = d ? (age < 1500 ? "en vivo" : `hace ${dur(age)}`) : "Sin datos";
+    $("enEstado").textContent = d ? dur(now - S.cicloDesde) : "Sin datos";
+    const cc = $("chipConn");
+    if (S.modo === "mqtt") chip(cc, S.mqttOk ? "ok" : "alarm", S.mqttOk ? "MQTT conectado" : "MQTT desconectado");
+    else if (S.modo === "servidor") chip(cc, S.mqttOk && S.brokerOk ? "ok" : "alarm", !S.mqttOk ? "Servidor sin conexión" : S.brokerOk ? "Servidor - broker OK" : "Servidor - sin broker");
+    else chip(cc, "", "Sin conexión");
+    const lk = (id, ok, txt) => { const el = $(id); setCls(el, "ok", ok === true); setCls(el, "bad", ok === false); $(id + "t").textContent = txt; };
+    if (!d) { lk("lkI2C", null, "Sin datos"); lk("lkUart", null, "Sin datos"); }
+    else {
+      const picoOk = d.pico_ok !== false && d.ciclo !== "SIN_PICO";
+      lk("lkI2C", stale ? null : picoOk, stale ? "?" : picoOk ? "latido OK" : "sin latido");
+      lk("lkUart", !stale, stale ? `sin datos ${dur(age)}` : "2 datos/s");
+    }
+    const webOk = S.modo === "mqtt" ? S.mqttOk : S.modo === "servidor" ? S.mqttOk && S.brokerOk : null;
+    lk("lkWeb", webOk, S.modo === "servidor" ? (webOk ? "vía servidor" : "sin conexión") : S.modo === "mqtt" ? (S.mqttOk ? "conectado" : "sin conexión") : "Sin datos");
+    const v = $("verdict"), activas = S.alarmas.filter((a) => a.estado === "activa"), st = d && (d.est1 ?? S.est1msg);
+    let cls = "ok", big = "Recibiendo datos", sub = "Llegan datos del robot por MQTT.";
+    const usb = activas.find((a) => a.clave.startsWith("usb:"));
+    if (usb) { cls = "alarm"; big = usb.tipo; sub = usb.valor[0].toUpperCase() + usb.valor.slice(1) + "."; }
+    else if (!d) { cls = ""; big = "Esperando datos"; sub = S.modo === "servidor" ? (S.brokerOk ? "El servidor está conectado al broker, todavía no llega scara/estado. Revisa el prefijo." : "El servidor no logra conectarse al broker.") : S.modo === "mqtt" ? !S.mqttOk ? "Conectando con el broker." : "Conectado al broker, todavía no llega scara/estado. Revisa el prefijo." : "Conéctate al broker."; }
+    else if (stale) { cls = "warn"; big = "Sin datos"; sub = `El último dato llegó hace ${dur(age)}. Revisa que el bridge y scada_mqtt.py estén corriendo.`; }
+    else if (activas.some((a) => a.prio === 1) || d.ciclo === "FALLA" || d.ciclo === "SIN_PICO") { cls = "alarm"; big = "Estación en falla"; sub = activas[0] ? `${activas[0].eje}: ${activas[0].tipo}` : CICLO_TXT[d.ciclo]; }
+    else if (activas.length) { cls = "warn"; big = "Aviso activo"; sub = `${activas[0].eje}: ${activas[0].tipo}`; }
+    else if (d.ciclo === "ESPERA") { big = "Lista para el home"; sub = "La Pico espera el Enter en el PC para empezar."; }
+    else if (/^(HOME_|ARRANQUE)/.test(d.ciclo)) { big = "Preparando"; sub = CICLO_TXT[d.ciclo]; }
+    else if (st && st.fase === "ESPERA_PILA") { big = "Esperando pila"; sub = st.ciclos ? "Ciclo terminado: las 4 tarjetas están en la bandeja." : "Coloca la pila de 4 tarjetas en cruz."; }
+    else if (st && faseIdx(st.fase) >= 0) { big = "En operación"; sub = st.tarjeta ? `Tarjeta ${st.tarjeta} de 4.` : sub; }
+    v.className = "panel verdict " + cls; $("verdictTxt").textContent = big; $("verdictSub").textContent = sub;
+  }
+
+  // ---------- Celda: brazo, pila y bandeja ----------
+  // A escala, con los datos de ik.py y secuencia_caja.py: X a la derecha, Y hacia adelante, base en (0, 0), en mm
+  const K = 0.7, BX = 200, BY = 262, L1 = 125.053 * K, L2 = 148.053 * K;
+  const mm = (x, y) => [BX + x * K, BY - y * K];
+  const BANDEJA = [[1.5, 195.5], [50.5, 195.5], [1.5, 241.5], [50.5, 241.5]]; // la 1 abajo a la izquierda
+  const POS_PILA = mm(-200, 145), POS_BANDEJA = mm(26, 218.5), SLOT = [34, 32];
+  const slotXY = (k) => mm(...BANDEJA[k - 1]);
+  const rad = (g) => (g * Math.PI) / 180;
+  // Igual que fk de ik.py, con joint_r1 = q2 (codo) y joint_r2 = -q1 (hombro), como manda p2p: ángulos desde el eje Y, horario
+  function armPts(r1, r2) {
+    const q1 = rad(-r2), q12 = q1 + rad(r1);
+    const j = [BX + L1 * Math.sin(q1), BY - L1 * Math.cos(q1)];
+    return [[BX, BY], j, [j[0] + L2 * Math.sin(q12), j[1] - L2 * Math.cos(q12)]];
+  }
+  // Estado de las tarjetas a partir de est1: cuántas salieron de la pila, cuántas están en la bandeja, si hay una en la ventosa
+  function conteo(st) {
+    if (!st) return { recogidas: 0, colocadas: 0, enMano: false };
+    if (st.fase === "ESPERA_PILA") return { recogidas: 0, colocadas: st.ciclos ? 4 : 0, enMano: false };
+    const k = st.tarjeta || 0, fi = faseIdx(st.fase), colocadas = st.colocadas ?? 0;
+    const enMano = k > 0 && fi >= 3 && fi <= 7 && colocadas < k;
+    return { recogidas: enMano || colocadas >= k ? k : k - 1, colocadas, enMano };
+  }
+  // Tarjeta con H1 en su esquina inferior izquierda (a 0°)
+  function cardSvg(x, y, ang, opts = {}) {
+    const w = opts.w || 27, h = opts.h || 27; // tarjeta de 38 x 38 mm
+    return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${-ang})" opacity="${opts.op ?? 1}">
+      <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="1.5" fill="var(--card)" stroke="var(--card-edge)" stroke-width="1"/>
+      <circle cx="${-w / 2 + 4}" cy="${h / 2 - 4}" r="2.3" fill="var(--h1)" stroke="var(--card-edge)" stroke-width=".6"/></g>`;
+  }
+  const armSvg = $("arm"), pSvg = $("pGauge");
+  function drawArm() {
+    const v = S.view, m = armPts(v.R1.pos, v.R2.pos), st = S.est;
+    const k = st && st.tarjeta, fi = st ? faseIdx(st.fase) : -1, c = conteo(st);
+    const grid = [];
+    for (let x = 0; x <= 400; x += 40) grid.push(`<line x1="${x}" y1="0" x2="${x}" y2="290" stroke="var(--line)" stroke-width=".4"/>`);
+    for (let y = 22; y <= 290; y += 40) grid.push(`<line x1="0" y1="${y}" x2="400" y2="${y}" stroke="var(--line)" stroke-width=".4"/>`);
+    let tray = `<rect x="${POS_BANDEJA[0] - SLOT[0] - 6}" y="${POS_BANDEJA[1] - SLOT[1] - 6}" width="${SLOT[0] * 2 + 12}" height="${SLOT[1] * 2 + 12}" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="${POS_BANDEJA[0] - SLOT[0] - 6}" y="${POS_BANDEJA[1] - SLOT[1] - 11}">Bandeja</text>`;
+    for (let s = 1; s <= 4; s++) {
+      const [x, y] = slotXY(s), target = k === s && fi >= 5 && c.colocadas < s;
+      tray += `<rect x="${x - 15}" y="${y - 15}" width="30" height="30" fill="none" stroke="${target ? "var(--signal)" : "var(--line)"}" stroke-dasharray="${target ? "4 2" : "2 2"}" stroke-width="${target ? 1.6 : 1}"/>`;
+      tray += s <= c.colocadas ? cardSvg(x, y, 0) : `<text x="${x - 3}" y="${y + 4}">${s}</text>`;
+    }
+    let pila = `<rect x="${POS_PILA[0] - 26}" y="${POS_PILA[1] - 26}" width="52" height="52" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="${POS_PILA[0] - 26}" y="${POS_PILA[1] - 31}">Pila</text>`;
+    const restantes = 4 - c.recogidas;
+    for (let i = 3; i >= c.recogidas; i--) pila += cardSvg(POS_PILA[0], POS_PILA[1], CFG.PILA[i], { op: i === c.recogidas ? 1 : 0.5 });
+    pila += `<text x="${POS_PILA[0] - 26}" y="${POS_PILA[1] + 40}">${restantes} en pila</text>`;
+    const p = (q) => q.map((cc) => cc.map((n) => n.toFixed(1)).join(",")).join(" ");
+    const carry = c.enMano ? cardSvg(m[2][0], m[2][1], fi >= 5 ? 0 : CFG.PILA[k - 1], { op: 0.95 }) : "";
+    setHTML(armSvg, `<rect width="400" height="290" fill="var(--well)"/>${grid.join("")}
+      <circle cx="${BX}" cy="${BY}" r="${L1 + L2}" fill="none" stroke="var(--muted)" stroke-dasharray="2 4" opacity=".6"/>
+      ${st && st.fase ? tray + pila : ""}
+      <polyline points="${p(m)}" fill="none" stroke="var(--process)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+      <rect x="${BX - 22}" y="${BY - 10}" width="44" height="30" rx="8" fill="var(--panel-2)" stroke="var(--muted)"/>
+      <circle cx="${m[0][0]}" cy="${m[0][1]}" r="9" fill="var(--panel)" stroke="var(--process)" stroke-width="3"/>
+      <circle cx="${m[1][0]}" cy="${m[1][1]}" r="7" fill="var(--panel)" stroke="var(--process)" stroke-width="3"/>
+      ${carry}
+      ${mandoV ? `<circle cx="${m[2][0] + mandoV[0] * 20 * K}" cy="${m[2][1] - mandoV[1] * 20 * K}" r="5" fill="var(--process)"/>` : ""}
+      <circle cx="${m[2][0]}" cy="${m[2][1]}" r="6" fill="${st && st.vacio ? "var(--signal)" : "var(--panel)"}" stroke="var(--process)" stroke-width="2.5"/>
+      <text x="${BX + 28}" y="${BY + 12}">R1 ${fmt(v.R1.pos)}°  R2 ${fmt(v.R2.pos)}°</text>
+      ${st && st.vacio ? `<text x="${m[2][0] + 12}" y="${m[2][1] - 14}" style="fill:var(--signal)">Ventosa</text>` : ""}`);
+    const cp = CFG.ejes.P, top = 22, bot = 262, yv = (p) => bot - ((clamp(p, cp.min, cp.max) - cp.min) / (cp.max - cp.min)) * (bot - top); // P = 0 es el suelo
+    const ticks = [0, 10, 20, 30, 40, 50].map((t) => { const y = yv(t); return `<line x1="28" x2="35" y1="${y}" y2="${y}" stroke="var(--muted)"/><text x="38" y="${y + 4}">${t}</text>`; }).join("");
+    setHTML(pSvg, `<rect x="12" y="${top}" width="14" height="${bot - top}" rx="7" fill="var(--panel-2)"/>
+      <rect x="12" y="${yv(v.P.pos).toFixed(1)}" width="14" height="${(bot - yv(v.P.pos)).toFixed(1)}" fill="var(--process-soft)"/>
+      <rect x="6" y="${(yv(v.P.pos) - 4).toFixed(1)}" width="26" height="8" rx="4" fill="var(--process)"/>${ticks}
+      <text x="2" y="284" style="fill:var(--ink)">P ${fmt(v.P.pos)} mm</text>`);
+  }
+  function drawPila(st) {
+    // Alzado lateral: a 0° la tarjeta se ve larga, a 90° se ve de canto (más corta)
+    const c = conteo(st);
+    let out = `<line x1="10" x2="150" y1="124" y2="124" stroke="var(--muted)"/>`;
+    for (let i = 0; i < 4; i++) {
+      const y = 100 - (3 - i) * 22, ang = CFG.PILA[i], w = ang === 0 ? 100 : 66, x = 82 - w / 2, fuera = i < c.recogidas, sig = !fuera && i === c.recogidas && !!st;
+      out += `<rect x="${x}" y="${y}" width="${w}" height="14" fill="${fuera ? "none" : "var(--card)"}" stroke="${sig ? "var(--signal)" : fuera ? "var(--line)" : "var(--card-edge)"}" stroke-dasharray="${fuera ? "3 3" : "none"}" stroke-width="${sig ? 2 : 1}"/>
+        <text x="4" y="${y + 11}" style="fill:${fuera ? "var(--muted)" : "var(--ink)"}">T${i + 1}</text>
+        <text x="${x + w + 4}" y="${y + 11}">${ang}°</text>`;
+    }
+    setHTML($("pila"), out);
+  }
+  let raf = 0;
+  function tick() { if (!raf) raf = requestAnimationFrame(frame); }
+  function frame() {
+    raf = 0; let moving = false;
+    const kf = 1;   // la muestra tal cual, sin suavizar
+    EJES.forEach((e) => { const v = S.view[e], tgt = v.tpos ?? v.pos, dlt = tgt - v.pos;
+      if (Math.abs(dlt) > 0.05) { v.pos += dlt * kf; moving = true; } else v.pos = tgt; });
+    drawArm(); if (moving) tick();
+  }
+
+  // ---------- MQTT ----------
+  let client = null;
+  let fuente = null;
+  function desconectar() {
+    if (client) { try { client.end(true); } catch {} client = null; }
+    if (fuente) { fuente.close(); fuente = null; }
+    S.mqttOk = false; S.brokerOk = false;
+  }
+  // Modo servidor: el backend escucha el broker y reenvía por Server-Sent Events
+  function conectarServidor() {
+    desconectar(); limpiar();
+    S.modo = "servidor"; $("connState").textContent = "Servidor";
+    fuente = new EventSource("api/stream");
+    fuente.onopen = () => { S.mqttOk = true; renderResumen(); };
+    fuente.onerror = () => { S.mqttOk = false; renderResumen(); };
+    const js = (fn) => (ev) => { try { fn(JSON.parse(ev.data)); } catch {} };
+    fuente.addEventListener("broker", js((b) => { S.brokerOk = !!b.broker_ok; renderResumen(); }));
+    fuente.addEventListener("estado", js(onEstado));
+    fuente.addEventListener("evento", js(onEvento));
+    fuente.addEventListener("est1", js(onEst1));
+    fetch("api/ciclos?limite=50").then((r) => r.json()).then((c) => {
+      if (!Array.isArray(c)) return;
+      S.tiempos = c.map((x) => x.duracion).filter((x) => typeof x === "number").reverse().concat(S.tiempos).slice(-50);
+      if (S.est) renderEstacion(S.est);
+    }).catch(() => {});
+  }
+  async function hayServidor() {
+    if (!/^https?:$/.test(location.protocol)) return false;
+    try {
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 1500);
+      const r = await fetch("api/salud", { cache: "no-store", signal: ctl.signal }); clearTimeout(to);
+      if (!r.ok) return false;
+      const j = await r.json(); return j && "broker_ok" in j;
+    } catch { return false; }
+  }
+  function conectar(cfg) {
+    desconectar(); limpiar();
+    S.modo = "mqtt"; renderResumen();
+    if (!window.mqtt) { $("connState").innerHTML = `<span class="err">No se pudo cargar la librería MQTT (mqtt.js). Revisa la conexión a internet.</span>`; return; }
+    const pre = cfg.prefix.replace(/\/+$/, "");
+    $("connState").textContent = "Conectando…";
+    client = window.mqtt.connect(cfg.url, { clientId: "scada-" + Math.random().toString(16).slice(2, 10), reconnectPeriod: 3000, connectTimeout: 8000,
+      username: cfg.user || undefined, password: cfg.pass || undefined, clean: true });
+    client.on("connect", () => { S.mqttOk = true; $("connState").textContent = "Conectado"; client.subscribe([`${pre}/estado`, `${pre}/evento`, `${pre}/est1`], { qos: 1 }); renderResumen(); });
+    if (PUBLICA) client.on("connect", () => client.subscribe(`${pre}/rviz`, { qos: 0 }));
+    client.on("reconnect", () => { $("connState").textContent = "Reintentando…"; });
+    client.on("close", () => { S.mqttOk = false; renderResumen(); });
+    client.on("error", (e) => { $("connState").innerHTML = `<span class="err">Error: ${String(e && e.message || e).replace(/</g, "&lt;")}</span>`; });
+    client.on("message", (topic, buf) => {
+      if (topic === `${pre}/rviz`) return fotoRviz(buf);
+      let j; try { j = JSON.parse(buf.toString()); } catch { return; }
+      const sub = topic.slice(pre.length + 1);
+      if (sub === "estado") onEstado(j); else if (sub === "evento") onEvento(j); else if (sub === "est1") onEst1(j);
+    });
+  }
+  function limpiar() {
+    Object.assign(S, { last: null, lastAt: 0, ciclo: null, alarmas: [], prevLoop: null, loopRate: null, loopQuieto: 0, tiempos: [], ultimoVisto: null, est: null, est1msg: null });
+    EJES.forEach((e) => { S.hist[e] = []; S.sen[e] = []; });
+    renderEstacion(null); renderAlarmas(); renderResumen();
+  }
+
+  // ---------- Controles ----------
+  $("btnConnToggle").addEventListener("click", () => { $("connPanel").hidden = !$("connPanel").hidden; });
+  $("btnServ").addEventListener("click", async () => {
+    if (await hayServidor()) { conectarServidor(); $("connPanel").hidden = true; }
+    else $("connState").innerHTML = `<span class="err">No hay servidor: abre la página desde el backend (uvicorn en web/backend).</span>`;
+  });
+  const conectarForm = () => conectar({ url: $("inUrl").value.trim(), prefix: $("inPrefix").value.trim() || "scara", user: $("inUser").value.trim(), pass: $("inPass").value });
+  ["inUrl", "inPrefix", "inUser"].forEach((id) => { const v = store.get("scada." + id); if (v) $(id).value = v; });
+  $("connForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    ["inUrl", "inPrefix", "inUser"].forEach((id) => store.set("scada." + id, $(id).value));
+    conectarForm();
+  });
+  // Botones Home y Secuencia: solo existen si la página viene de herramientas/scada_web.py, que corre home.sh y secuencia.sh
+  const acc = { hay: false, home: {}, secuencia: {}, msg: "" };
+  function pintarAcc() {
+    const vivo = !!S.last && Date.now() - S.lastAt < CFG.STALE_MS, h = acc.home, q = acc.secuencia;
+    const enHome = h.corriendo && !h.listo, ocupado = enHome || q.corriendo;
+    const bh = $("btnHome"), bs = $("btnSeq");
+    ver(bh, acc.hay); ver(bs, acc.hay);
+    bh.disabled = ocupado; bh.textContent = enHome ? "Haciendo home…" : "Home";
+    bs.disabled = ocupado || !vivo; bs.textContent = q.corriendo ? "Secuencia corriendo…" : "Secuencia";
+    const tel = !!acc.teleop;
+    const texto = (id, cls, t) => { const el = $(id); el.className = cls; el.textContent = t; };
+    const pico = PUBLICA ? vivo : acc.pico;   // la página pública no ve el USB: solo sabe si llegan datos
+    texto("eqPico", pico ? "ok" : PUBLICA ? "" : "bad", pico ? "Conectada" : PUBLICA ? "Sin datos" : "No conectada");
+    texto("eqRos", vivo ? "ok" : "", vivo ? "Bridge activo" : "Sin datos");
+    texto("eqModo", tel || q.corriendo || enHome ? "aviso" : "", acc.mando ? "Control" : tel ? "Teleop" : q.corriendo ? "Secuencia" : enHome ? "Haciendo home" : "En espera");
+    setCls($("btnTeleop"), "activo", tel);
+    ver($("btnTeleop"), acc.hay); $("btnTeleop").disabled = !tel && (ocupado || !vivo);
+    $("btnTeleop").textContent = tel ? "Salir de teleop" : "Teleop"; ver($("telPanel"), tel && acc.hay);
+    ver($("btnControl"), acc.hay); setCls($("btnControl"), "activo", acc.mando); $("btnControl").disabled = !acc.mando && (tel || ocupado || !vivo);
+    document.querySelectorAll(".tel button[data-k]").forEach((b) => { b.disabled = !!acc.mando && !"zx".includes(b.dataset.k); });   // Control no mueve por ejes
+    $("btnControl").setAttribute("aria-pressed", !!acc.mando);
+    if (!tel || ocupado || !vivo) soltar();   // sin datos del robot tampoco se sigue pidiendo movimiento
+    bh.disabled = bh.disabled || tel; bs.disabled = bs.disabled || tel;
+    ver($("ctlRow"), acc.hay); $("btnSubir").disabled = ocupado || tel || !!acc.motivo; $("btnIr").disabled = ocupado || tel || !vivo;
+    $("ctlActivo").textContent = acc.controlador ? `Subido: RST ${acc.controlador}` : "";
+    bs.title = !vivo ? "Sin datos del robot: haz el home o revisa que scada_mqtt.py esté corriendo" : "";
+    const linea = acc.alerta || (q.corriendo ? q.linea : enHome ? h.linea : acc.msg || q.linea || h.linea || "");
+    $("accMsg").textContent = linea; $("accMsg").title = linea;
+    pintarRviz();
+  }
+  // Visor: solo pide el video con la pestaña a la vista. Si RViz no da imagen se dice, nunca se deja una imagen vieja como si fuera actual
+  const PUBLICA = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // publicada en la web: sin servidor; RViz llega por MQTT
+  let tRviz = 0, urlRviz = null;
+  function fotoRviz(buf) {
+    const url = URL.createObjectURL(new Blob([buf], { type: "image/jpeg" }));
+    $("rvizImg").src = url;
+    if (urlRviz) URL.revokeObjectURL(urlRviz);
+    urlRviz = url; tRviz = Date.now();
+  }
+  function pintarRviz(reconectar) {
+    const img = $("rvizImg"), r = acc.rviz, mirando = !$("paneResumen").hidden && !document.hidden && !!(r && r.abierto);
+    if (!PUBLICA && (reconectar || !mirando)) img.removeAttribute("src");
+    if (!PUBLICA && mirando && !img.getAttribute("src")) img.src = `rviz.mjpg?${Date.now()}`;
+    const edad = r ? r.edad_s : null, fresca = edad != null && edad < 2;
+    const fijar = (cls, txt, tit, sub, cmd) => {
+      $("rvizEstado").className = "visor-estado " + cls; $("rvizTxt").textContent = txt; $("rvizTit").textContent = tit; $("rvizSub").textContent = sub;
+      $("rvizCmd").hidden = !cmd; $("rvizMsg").hidden = !tit; img.hidden = !!tit;
+    };
+    if (PUBLICA && Date.now() - tRviz < 3000) fijar("ok", "En vivo", "", "");
+    else if (PUBLICA) fijar("", "Solo lectura", "Esperando la imagen de RViz", "Esta página pública muestra el robot en vivo y no puede moverlo.");
+    else if (!acc.hay) fijar("bad", "Sin servidor", "No responde el servidor de la página", "Revisa que scada_web.py esté corriendo.");
+    else if (!r || !r.abierto) fijar("", "RViz cerrado", "RViz está cerrado", "Ábrelo en una terminal, desde SCARA_Robotica. Solo muestra el robot, no lo mueve:", true);
+    else if (edad == null) fijar("", "Cargando", "Conectando con RViz", "");
+    else if (!fresca) fijar("aviso", "Sin imágenes nuevas", "No llegan imágenes nuevas", `La última llegó hace ${fmt(edad, 0)} s. Prueba Reconectar.`);
+    else fijar("ok", "En vivo", "", "");
+    $("rvizAyuda").hidden = !(fresca && r && r.camara);
+    $("rvizAviso").hidden = !img.getAttribute("src") || img.hidden || (!!S.last && Date.now() - S.lastAt < CFG.STALE_MS);
+  }
+  $("rvizRe").addEventListener("click", () => pintarRviz(true));
+  // Cámara: arrastrar gira, botón central desplaza, botón derecho o rueda acerca. Solo mueve la vista, nunca el robot.
+  // Va un envío a la vez y se queda con el último movimiento, para no atrasarse si el servidor tarda
+  const lienzo = document.querySelector(".lienzo");
+  let camEnvio = false, camFila = null, camBoton = 0;
+  function camPos(ev) {
+    const img = $("rvizImg"), c = lienzo.getBoundingClientRect(), k = Math.min(c.width / img.naturalWidth, c.height / img.naturalHeight);
+    const w = img.naturalWidth * k, h = img.naturalHeight * k;
+    return { x: clamp((ev.clientX - c.left - (c.width - w) / 2) / w, 0, 1), y: clamp((ev.clientY - c.top - (c.height - h) / 2) / h, 0, 1) };
+  }
+  async function camara(d) {
+    if (camEnvio) { if (d.t !== "move" || !camFila || camFila.t === "move") camFila = d; return; }
+    camEnvio = true;
+    await post("api/rviz/camara", d).catch(() => {});
+    camEnvio = false;
+    if (camFila) { const n = camFila; camFila = null; camara(n); }
+  }
+  const camActiva = () => !$("rvizImg").hidden && acc.rviz && acc.rviz.camara;
+  lienzo.addEventListener("pointerdown", (ev) => {
+    if (!camActiva()) return;
+    ev.preventDefault(); lienzo.setPointerCapture(ev.pointerId); camBoton = ev.button + 1;
+    camara({ t: "down", b: camBoton, ...camPos(ev) });
+  });
+  lienzo.addEventListener("pointermove", (ev) => { if (camBoton) camara({ t: "move", ...camPos(ev) }); });
+  const camSoltar = (ev) => { if (camBoton) camara({ t: "up", ...camPos(ev) }); camBoton = 0; };
+  lienzo.addEventListener("pointerup", camSoltar); lienzo.addEventListener("pointercancel", camSoltar);
+  lienzo.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  lienzo.addEventListener("wheel", (ev) => { if (camActiva()) { ev.preventDefault(); camara({ t: "wheel", d: ev.deltaY < 0 ? 1 : -1, ...camPos(ev) }); } }, { passive: false });
+  $("rvizFull").addEventListener("click", () => { if (document.fullscreenElement) document.exitFullscreen(); else $("visor").requestFullscreen(); });
+  async function estadoAcc() {
+    try {
+      const r = await fetch("api/estado", { cache: "no-store" }); if (!r.ok) throw 0;
+      Object.assign(acc, await r.json(), { hay: true });
+      // Durante el home la Pico desaparece un rato (recarga el firmware). Dos lecturas seguidas: el USB a veces parpadea
+      const enHome = acc.home.corriendo && !acc.home.listo;
+      acc.sinPico = acc.pico === false && !enHome ? (acc.sinPico || 0) + 1 : 0;
+      if (acc.sinPico >= 2) alarma("usb:off", "Pico", "Pico desconectada", "revisa el USB", 1);
+      else if (acc.pico) normalizar("usb:off");
+      // La Pico puede reiniciarse y volver en segundos: el puerto sigue ahí, pero sin home ya no llegan datos
+      const mudo = acc.pico && !enHome && S.mqttOk && !!S.last && Date.now() - S.lastAt > CFG.STALE_MS;
+      if (mudo) alarma("usb:mudo", "Pico", "No llegan datos de la Pico", "revisa el bridge, scada_mqtt y el home", 1);
+      else normalizar("usb:mudo");
+      acc.alerta = acc.sinPico >= 2 ? "Pico desconectada" : mudo ? "No llegan datos de la Pico" : "";
+      renderAlarmas(); renderResumen();
+    } catch { acc.hay = false; }
+    pintarAcc();
+  }
+  async function lanzar(ruta) {
+    acc.msg = "";
+    const r = await fetch(ruta, { method: "POST" }).catch(() => null);
+    if (!r || !r.ok) { const j = r ? await r.json().catch(() => ({})) : {}; acc.msg = `No arrancó: ${j.error || (r ? "HTTP " + r.status : "sin servidor")}`; }
+    estadoAcc();
+  }
+  // Controlador: cada cambio simula al instante; subir escribe rst_activo.h, compila y hace el home
+  const post = (ruta, datos) => fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+  const leerCtl = () => ({ tipo: $("ctlTipo").value, wn: +$("cWn").value, zeta: +$("cZeta").value, r: +$("cR").value, kp: +$("cKp").value, ti: +$("cTi").value, td: +$("cTd").value });
+  async function simular() {
+    const t = $("ctlTipo").value;
+    document.querySelectorAll("[data-c]").forEach((el) => ver(el, el.dataset.c === (t === "enmascarado" ? "enm" : "rst") && t !== "implementado"));
+    const r = await post("api/simular", leerCtl()).catch(() => null), j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) { acc.motivo = j.error || "sin servidor"; $("ctlMsg").textContent = acc.motivo; pintarAcc(); return; }
+    acc.motivo = j.motivo;
+    $("ctlMsg").textContent = j.motivo ? `No se puede subir: ${j.motivo}` : "";
+    pintarAcc();
+  }
+  ["ctlTipo", "cWn", "cZeta", "cR", "cKp", "cTi", "cTd"].forEach((id) => $(id).addEventListener("change", simular));
+  $("btnSubir").addEventListener("click", async () => {
+    if (!confirm("Esto sube el firmware a la Pico y hace Home: el brazo se va a mover. ¿Continuar?")) return;
+    const r = await post("api/controlador", leerCtl()).catch(() => null), j = r ? await r.json().catch(() => ({})) : {};
+    $("ctlMsg").textContent = r && r.ok ? "Subiendo…" : (j.error || "sin servidor");
+    estadoAcc();
+  });
+  // Lo que pase del alcance va al máximo en esa dirección (los mismos topes de p2p.py) y queda escrito en las casillas
+  const IR_ALCANCE = 272.6, IR_P_MAX = 50;   // mm
+  // Igual que alcanzable() de p2p.py: fuera de los rangos el firmware recorta cada eje y el brazo iría a otro punto
+  function irAlcanzable(x, y) {
+    const a = L1 / K, b = L2 / K, r = Math.hypot(x, y), c2 = (r * r - a * a - b * b) / (2 * a * b), c1 = (a * a + r * r - b * b) / (2 * r * a);
+    if (!(r > 0) || Math.abs(c2) > 1 || Math.abs(c1) > 1) return false;
+    const q2 = Math.acos(c2), phi = Math.acos(c1), t = Math.atan2(x, y);
+    return [[q2, phi - t], [-q2, -phi - t]].some(([r1, g]) => { const r2 = Math.atan2(Math.sin(g), Math.cos(g)); return r1 >= -1.81 && r1 <= 1.885 && r2 >= -1.46 && r2 <= 1.5708; });
+  }
+  function limitarIr() {
+    const d = { x: +$("irX").value, y: +$("irY").value, p: +$("irP").value }, dist = Math.hypot(d.x, d.y);
+    const corto = (v) => Math.trunc(v * 10) / 10, limitado = dist > IR_ALCANCE || d.p < 0 || d.p > IR_P_MAX;
+    if (dist > IR_ALCANCE) { d.x = corto(d.x * IR_ALCANCE / dist); d.y = corto(d.y * IR_ALCANCE / dist); }
+    d.p = Math.min(Math.max(d.p, 0), IR_P_MAX);
+    if (limitado) { $("irX").value = d.x; $("irY").value = d.y; $("irP").value = d.p; $("irMsg").textContent = "Ajustado al máximo"; }
+    else $("irMsg").textContent = "";
+    if (!irAlcanzable(d.x, d.y)) $("irMsg").textContent = "Ese punto no lo alcanza el brazo: no se envía";
+    return d;
+  }
+  ["irX", "irY", "irP"].forEach((id) => $(id).addEventListener("change", limitarIr));
+  $("irForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const d = limitarIr();
+    if (!irAlcanzable(d.x, d.y)) return;
+    const r = await post("api/ir", d).catch(() => null), j = r ? await r.json().catch(() => ({})) : {};
+    $("irMsg").textContent = r && r.ok ? "Enviado" : (j.error || "sin servidor");
+  });
+  simular();
+  $("btnHome").addEventListener("click", () => lanzar("api/home"));
+  // Teleop: mientras un botón esté presionado se repite la tecla; el servidor la suelta sola si deja de llegar
+  let telTimer = 0, telBtn = null;
+  const tecla = (k) => post("api/tecla", { k }).catch(soltar);   // sin servidor: se suelta, y allá el hombre muerto la corta
+  function soltar() {
+    if (!telBtn) return;
+    clearInterval(telTimer); telBtn.classList.remove("on"); telBtn = null; tecla(null);
+  }
+  function presionar(b) {
+    soltar(); telBtn = b; b.classList.add("on"); tecla(b.dataset.k);
+    telTimer = setInterval(() => tecla(b.dataset.k), 100);
+  }
+  // Bomba: a diferencia de los ejes se queda como está. b y n se pueden repetir sin problema: dicen el estado, no lo invierten
+  let bombaOn = false;
+  async function bomba(on) {
+    const r = await post("api/tecla", { k: on ? "b" : "n" }).catch(() => null);
+    setTimeout(() => tecla(null), 120);
+    if (!r || !r.ok) return;
+    bombaOn = on; setCls($("btnBomba"), "on", on);
+    $("btnBomba").textContent = on ? "Bomba: prendida" : "Bomba: apagada"; $("btnBomba").setAttribute("aria-pressed", on);
+  }
+  $("btnBomba").addEventListener("click", () => bomba(!bombaOn));
+  document.querySelectorAll(".tel button[data-k]").forEach((b) => {
+    b.addEventListener("pointerdown", (ev) => { ev.preventDefault(); b.setPointerCapture(ev.pointerId); presionar(b); });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((n) => b.addEventListener(n, soltar));
+  });
+  // El teclado hace lo mismo que los botones, solo con teleop encendido y fuera de los campos de texto
+  addEventListener("keydown", (ev) => {
+    const b = acc.teleop && !ev.repeat && !ev.target.closest?.("input, select") && document.querySelector(`.tel button[data-k="${ev.key.toLowerCase()}"]`);
+    if (b) { ev.preventDefault(); presionar(b); }
+  });
+  addEventListener("keyup", (ev) => { if (telBtn && telBtn.dataset.k === ev.key.toLowerCase()) soltar(); });
+  addEventListener("blur", soltar);
+  document.addEventListener("visibilitychange", soltar);
+  // Mando de Xbox: el stick izquierdo mueve la punta por el plano y el derecho a P. Solo con RT sostenido, por si un stick
+  // deriva o el mando se golpea. teleop calcula el punto con la posición medida; aquí solo se manda hacia dónde. Sin foco
+  // el navegador deja de actualizar el mando: se suelta
+  const MANDO_UMBRAL = 0.5, MANDO_MUERTO = 0.15, MANDO_ENVIO_MS = 100;
+  let mandoK = null, mandoA = false, mandoV = null, tMando = 0;
+  // Vibración: avisa al acercarse a un límite mientras se mueve, más fuerte cuanto más cerca (0 = lejos, 1 = en el límite)
+  const VIBRA_XY = 25, VIBRA_R = 12, VIBRA_P = 5, VIBRA_MS = 150;   // mm, ° y mm antes del límite en que empieza
+  let vibrando = false, tVibra = 0;
+  const posEje = (e) => S.view[e].tpos ?? S.view[e].pos;
+  function cercaLimite([vx, vy, vp]) {
+    if (Date.now() - S.lastAt > CFG.STALE_MS) return 0;
+    const margenes = [], q1 = rad(-posEje("R2")), q12 = q1 + rad(posEje("R1"));
+    if (vx || vy) {
+      const x = (L1 * Math.sin(q1) + L2 * Math.sin(q12)) / K, y = (L1 * Math.cos(q1) + L2 * Math.cos(q12)) / K;
+      if (x * vx + y * vy > 0) margenes.push((IR_ALCANCE - Math.hypot(x, y)) / VIBRA_XY);
+      ["R1", "R2"].forEach((e) => { const c = CFG.ejes[e], p = posEje(e); margenes.push((p - c.min) / VIBRA_R, (c.max - p) / VIBRA_R); });
+    }
+    if (vp) margenes.push((vp > 0 ? IR_P_MAX - posEje("P") : posEje("P")) / VIBRA_P);
+    return margenes.length ? 1 - Math.min(Math.max(Math.min(...margenes), 0), 1) : 0;
+  }
+  function vibrar(p, n) {
+    const act = p && p.vibrationActuator;
+    if (!act) return;
+    if (n <= 0) { if (vibrando) act.reset?.(); vibrando = false; return; }
+    if (Date.now() - tVibra < VIBRA_MS) return;
+    tVibra = Date.now(); vibrando = true;
+    act.playEffect("dual-rumble", { duration: VIBRA_MS + 70, strongMagnitude: 0.2 + 0.8 * n, weakMagnitude: 0.2 + 0.8 * n }).catch(() => {});
+  }
+  const palanca = (v) => Math.abs(v) < MANDO_MUERTO ? 0 : Math.sign(v) * ((Math.abs(v) - MANDO_MUERTO) / (1 - MANDO_MUERTO)) ** 1.5;   // poco stick = preciso, a fondo = rápido
+  function leerMando() {
+    const pads = [...(navigator.getGamepads?.() || [])].filter((p) => p && p.connected), p = pads.find((m) => m.mapping === "standard");
+    $("mandoEstado").textContent = p && !acc.mando ? "Mando conectado. Pulsa Control para usarlo"
+      : p ? "Control activo. Mantén RT: stick izquierdo mueve el punto en X e Y, stick derecho P, LB y RB servo. A: bomba"
+      : pads.length ? "Este mando no tiene el mapa estándar: no se usa" : "Mando de Xbox: pulsa un botón para conectarlo";
+    if (acc.mando && Date.now() - S.lastAt > CFG.STALE_MS) $("mandoEstado").textContent = "No llegan datos: la Pico pudo reiniciarse. Si no vuelven, haz Home";
+    const activo = !!p && acc.mando && acc.teleop && document.hasFocus() && !document.hidden, rt = activo && p.buttons[7].value > MANDO_UMBRAL;
+    const k = !rt ? null : p.buttons[4].pressed ? "z" : p.buttons[5].pressed ? "x" : null;
+    if (k !== mandoK) {
+      if (mandoK) soltar();
+      if (k) presionar(document.querySelector(`.tel button[data-k="${k}"]`));
+      mandoK = k;
+    }
+    const v = rt && !k ? [palanca(p.axes[0]), palanca(-p.axes[1]), palanca(-p.axes[3])] : [0, 0, 0], mueve = v.some(Boolean);
+    if (mueve ? Date.now() - tMando >= MANDO_ENVIO_MS : mandoV) {
+      post("api/plano", { vx: v[0], vy: v[1], vp: v[2] }).catch(() => {});
+      tMando = Date.now();
+    }
+    mandoV = mueve ? v : null;
+    const cerca = mueve ? cercaLimite(v) : 0;
+    vibrar(p, cerca);
+    if (cerca > 0) $("mandoEstado").textContent = "Cerca del límite del espacio de trabajo";
+    const a = activo && p.buttons[0].pressed;
+    if (a && !mandoA) bomba(!bombaOn);
+    mandoA = a;
+  }
+  setInterval(leerMando, 50);
+  // Control: el mando solo cuenta con este botón prendido. Corre control_mando.py en vez de teleop, sin cambiar de pestaña para seguir viendo RViz
+  $("btnControl").addEventListener("click", async () => {
+    if (acc.mando) { $("btnTeleop").click(); return; }
+    await post("api/teleop", { on: true, mando: true }).catch(() => {});
+    estadoAcc();
+  });
+  $("btnTeleop").addEventListener("click", async () => {
+    if (!acc.teleop) { verPane("paneEjes"); moverHoja(true); }
+    else if (bombaOn) { await bomba(false); await new Promise((r) => setTimeout(r, 150)); }   // sin el panel no habría cómo apagarla
+    await post("api/teleop", { on: !acc.teleop }).catch(() => {});
+    estadoAcc();
+  });
+  $("btnSeq").addEventListener("click", () => lanzar("api/secuencia"));
+  setInterval(estadoAcc, 1000); estadoAcc();
+  // Movimiento: resortes que parten del valor en pantalla y heredan la velocidad, así todo se puede interrumpir.
+  // Solo la interfaz se anima: los datos del robot (números y gráficas) se muestran tal cual llegan.
+  const sinMovimiento = matchMedia("(prefers-reduced-motion: reduce)");
+  function resorte(pintar, x = 0, eps = 0.1) {
+    const s = { x, v: 0, meta: x, damping: 1, response: 0.4, quieto: null };
+    let raf = 0, t0 = 0;
+    const paso = (t) => {
+      let dt = Math.min((t - t0) / 1000, 1 / 20); t0 = t;
+      const w = (2 * Math.PI) / s.response;
+      for (; dt > 0; dt -= 1 / 480) {
+        const h = Math.min(dt, 1 / 480);
+        s.v += (-w * w * (s.x - s.meta) - 2 * s.damping * w * s.v) * h; s.x += s.v * h;
+      }
+      const fin = Math.abs(s.x - s.meta) < eps && Math.abs(s.v) < eps * 10;
+      if (fin) { s.x = s.meta; s.v = 0; raf = 0; } else raf = requestAnimationFrame(paso);
+      pintar(s.x);
+      if (fin && s.quieto) s.quieto();
+    };
+    s.fijar = (x) => { cancelAnimationFrame(raf); raf = 0; Object.assign(s, { x, v: 0, meta: x }); pintar(x); };
+    s.ir = (meta, { v = s.v, damping = 1, response = 0.4 } = {}) => {
+      Object.assign(s, { meta, v, damping, response });
+      if (sinMovimiento.matches || document.hidden) { s.fijar(meta); if (s.quieto) s.quieto(); return; }
+      if (!raf) { t0 = performance.now(); raf = requestAnimationFrame(paso); }
+    };
+    return s;
+  }
+  // Botones: responden al apoyar el dedo, no al soltar
+  const prensas = new WeakMap();
+  let prensado = null;
+  function prensar(b, escala, response) {
+    if (!prensas.has(b)) prensas.set(b, resorte((x) => { b.style.transform = x === 1 ? "" : `scale(${x.toFixed(4)})`; }, 1, 0.001));
+    prensas.get(b).ir(escala, { response });
+  }
+  addEventListener("pointerdown", (ev) => {
+    const b = ev.target.closest && ev.target.closest("button:not(:disabled)");
+    if (b) { prensado = b; prensar(b, 0.96, 0.12); }
+  }, true);
+  ["pointerup", "pointercancel"].forEach((n) => addEventListener(n, () => { if (prensado) prensar(prensado, 1, 0.3); prensado = null; }, true));
+  // Pestañas: el subrayado viaja de una a otra y el panel entra desde el lado de la pestaña elegida
+  const ind = { x: 0, w: 0 };
+  const pintarInd = () => { const el = $("tabInd"); el.style.transform = `translateX(${ind.x.toFixed(1)}px)`; el.style.width = `${ind.w.toFixed(1)}px`; };
+  const indX = resorte((x) => { ind.x = x; pintarInd(); }), indW = resorte((w) => { ind.w = w; pintarInd(); });
+  function moverInd(animar) {
+    const t = document.querySelector('.tab[aria-selected="true"]'); if (!t) return;
+    if (animar) { indX.ir(t.offsetLeft); indW.ir(t.offsetWidth); } else { indX.fijar(t.offsetLeft); indW.fijar(t.offsetWidth); }
+  }
+  const paneS = resorte((x) => {
+    const p = document.querySelector(".pane:not([hidden])"); if (!p) return;
+    p.style.transform = x ? `translateX(${x.toFixed(1)}px)` : ""; p.style.opacity = x ? 1 - Math.min(Math.abs(x) / 60, 1) * 0.8 : "";
+  }, 0, 0.2);
+  // Controlador: hoja que sigue al dedo 1:1, proyecta el impulso al soltar y se puede agarrar en pleno vuelo
+  const hoja = $("ctlRow"), asa = $("hojaAsa"), cuerpo = $("hojaCuerpo"), ancho = matchMedia("(min-width: 1000px)");
+  const ZONA_MUERTA = 10, ELASTICO = 70;
+  const cerrada = () => Math.max(hoja.offsetHeight - asa.offsetHeight, 0);
+  const elastico = (d) => ELASTICO * (1 - 1 / (d / ELASTICO * 0.55 + 1));   // la resistencia crece al pasarse del tope
+  const hojaS = resorte((y) => {
+    if (!ancho.matches) { hoja.style.transform = cuerpo.style.opacity = ""; return; }
+    const p = Math.min(Math.max(1 - y / (cerrada() || 1), 0), 1);
+    hoja.style.transform = y ? `translateY(${y.toFixed(1)}px)` : ""; cuerpo.style.opacity = p; $("hojaChev").style.transform = `rotate(${180 * p}deg)`;
+  }, 0, 0.3);
+  function textoSvg() {
+    ["arm", "pGauge", "pila"].forEach((id) => {
+      const svg = $(id), b = svg.viewBox.baseVal, k = Math.min(svg.clientWidth / b.width, svg.clientHeight / b.height);
+      if (k > 0) svg.style.setProperty("--fs", `${(15 / k).toFixed(2)}px`);
+    });
+  }
+  function reservarHoja() {
+    // Al detenerse, las gráficas toman el alto que la hoja deja libre
+    const libre = ancho.matches ? Math.max(hoja.offsetHeight - hojaS.x, 0) : 0;
+    $("app").style.setProperty("--hoja", `${libre}px`); EJES.forEach(drawSenal); textoSvg(); drawHist();
+  }
+  hojaS.quieto = () => {
+    const abierta = hojaS.meta === 0;
+    asa.setAttribute("aria-expanded", String(abierta)); cuerpo.inert = ancho.matches && !abierta;
+    store.set("scada.hoja", abierta ? "abierta" : "cerrada"); reservarHoja();
+  };
+  const moverHoja = (abrir) => hojaS.ir(abrir ? 0 : cerrada(), { response: 0.3 });
+  let agarre = null, hojaLista = false;
+  asa.addEventListener("pointerdown", (ev) => {
+    if (!ancho.matches) return;
+    const enVuelo = hojaS.x !== hojaS.meta;
+    asa.setPointerCapture(ev.pointerId); hojaS.fijar(hojaS.x);
+    agarre = { y: ev.clientY, base: hojaS.x, sigue: false, enVuelo, k: hoja.getBoundingClientRect().height / hoja.offsetHeight, m: [] };
+  });
+  asa.addEventListener("pointermove", (ev) => {
+    if (!agarre) return;
+    let d = (ev.clientY - agarre.y) / agarre.k;
+    if (!agarre.sigue) {
+      if (Math.abs(d) < ZONA_MUERTA) return;
+      agarre.sigue = true; agarre.y = ev.clientY; d = 0;   // sin salto: sigue desde donde se pasó la zona muerta
+    }
+    const c = cerrada(), y = agarre.base + d;
+    hojaS.fijar(y < 0 ? -elastico(-y) : y > c ? c + elastico(y - c) : y);
+    agarre.m.push({ t: ev.timeStamp, y }); if (agarre.m.length > 8) agarre.m.shift();
+  });
+  function soltarHoja(ev) {
+    if (!agarre) return;
+    const g = agarre, c = cerrada(); agarre = null;
+    if (!g.sigue) return moverHoja(g.enVuelo ? hojaS.x < c / 2 : hojaS.x > c / 2);   // toque: alterna; si la agarró en vuelo, a la más cercana
+    const m = g.m.filter((p) => ev.timeStamp - p.t < 100), dt = m.length > 1 ? m[m.length - 1].t - m[0].t : 0;
+    const v = dt ? ((m[m.length - 1].y - m[0].y) / dt) * 1000 : 0;   // px/s
+    const proyectada = hojaS.x + v * 0.499;   // v * d / (1 - d) / 1000 con d = 0.998
+    hojaS.ir(Math.abs(proyectada) < Math.abs(proyectada - c) ? 0 : c, { v, damping: Math.abs(v) > 600 ? 0.8 : 1, response: 0.3 });
+  }
+  asa.addEventListener("pointerup", soltarHoja); asa.addEventListener("pointercancel", soltarHoja);
+  asa.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); moverHoja(hojaS.meta !== 0); }
+  });
+  new ResizeObserver(() => {
+    if (agarre || !hoja.offsetHeight) return;
+    if (!hojaLista && store.get("scada.hoja") !== "abierta") { hojaS.fijar(cerrada()); cuerpo.inert = ancho.matches; asa.setAttribute("aria-expanded", "false"); }
+    else if (hojaS.meta !== 0 && hojaS.x === hojaS.meta) hojaS.fijar(cerrada());   // cambió de alto estando cerrada
+    hojaLista = true; reservarHoja();
+  }).observe(hoja);
+  ancho.addEventListener("change", () => { cuerpo.inert = false; hojaS.fijar(0); reservarHoja(); });
+  // Pestañas
+  const PANES = { paneResumen: "Resumen", paneEstacion: "Estación", paneEjes: "Ejes" };
+  function verPane(id) {
+    const antes = Object.keys(PANES).find((p) => !$(p).hidden), orden = Object.keys(PANES);
+    if (antes && antes !== id) { $(antes).style.transform = $(antes).style.opacity = ""; paneS.x = Math.min(Math.max(paneS.x + Math.sign(orden.indexOf(id) - orden.indexOf(antes)) * 40, -60), 60); }
+    document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.pane === id)));
+    Object.keys(PANES).forEach((p) => ($(p).hidden = p !== id));
+    $("paneTitle").textContent = PANES[id]; store.set("scada.pane", id); tick();
+    if (id === "paneEjes") { EJES.forEach(drawSenal); simular(); }
+    moverInd(true); paneS.ir(0, { v: 0 }); textoSvg(); drawHist();
+  }
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => verPane(t.dataset.pane)));
+  EJES.forEach((e) => {
+    const svg = $("sg" + e);
+    svg.addEventListener("pointermove", (ev) => { S.hover = { e, x: ev.offsetX }; drawSenal(e); });
+    svg.addEventListener("pointerleave", () => { S.hover = null; drawSenal(e); });
+  });
+  verPane(PANES[store.get("scada.pane")] ? store.get("scada.pane") : "paneResumen");
+  // Tema claro u oscuro (se recuerda en este navegador)
+  const raiz = document.documentElement, temaG = store.get("scada.tema");
+  if (temaG === "dark" || temaG === "light") raiz.dataset.theme = temaG;
+  $("btnTheme").addEventListener("click", () => {
+    const oscuro = raiz.dataset.theme ? raiz.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    raiz.dataset.theme = oscuro ? "light" : "dark"; store.set("scada.tema", raiz.dataset.theme);
+  });
+  $("btnClose").addEventListener("click", () => { $("connPanel").hidden = true; });
+  $("connPanel").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) ev.currentTarget.hidden = true; });
+  // En computador todo va en un lienzo de 900 px de alto que se escala a la ventana: nunca hay scroll
+  const pantalla = matchMedia("(min-width: 1000px)");
+  function ajustar() {
+    const st = $("app");
+    if (!pantalla.matches) { st.style.transform = ""; st.style.width = ""; st.style.height = ""; return; }
+    const W = Math.round(clamp((900 * innerWidth) / innerHeight, 1440, 2100)), k = Math.min(innerWidth / W, innerHeight / 900);
+    st.style.width = innerWidth / k + "px"; st.style.height = innerHeight / k + "px";
+    st.style.transform = `scale(${k.toFixed(4)})`;
+  }
+  addEventListener("resize", () => { EJES.forEach(drawSenal); moverInd(false); textoSvg(); drawHist(); });
+  document.fonts.ready.then(() => moverInd(false));
+  addEventListener("resize", ajustar); pantalla.addEventListener("change", ajustar); ajustar();
+  setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString("es", { hour12: false }); renderResumen(); }, 500);
+
+  renderEstacion(null); drawArm(); renderAlarmas();
+  // Desde el backend se conecta sola al servidor; sin servidor, se conecta sola al broker (mqtt.js carga con defer: esperar a load)
+  addEventListener("load", () => hayServidor().then((ok) => (ok ? conectarServidor() : conectarForm())));
+})();
+</script>
+
+</body></html>

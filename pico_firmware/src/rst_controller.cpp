@@ -16,9 +16,22 @@ static void push(double* h, int n, double v) {   // desplaza el historial y pone
     h[0] = v;
 }
 
+// RST posicional: voltaje absoluto. du_ guarda aquí los u pasados, no los incrementos
+float RstController::step_posicional(float ref) {
+    double u = p_.T[0] * ref;
+    for (int i = 0; i < 5; ++i) u -= p_.R[i] * y_[i];
+    for (int i = 0; i < 3; ++i) u -= p_.Sp[i + 1] * du_[i];
+    if (u >  u_max_) u =  u_max_;
+    if (u < -u_max_) u = -u_max_;
+    push(du_, 3, u);
+    u_ = u;
+    return static_cast<float>(u_);
+}
+
 float RstController::step(float ref, float y) {
     // 1. Historial de y y referencia suavizada y*(k)
     push(y_, 5, y);
+    if (p_.posicional) return step_posicional(ref);
     push(ys_, 8, -p_.Am[1] * ys_[0] - p_.Am[2] * ys_[1] + p_.Bm * r_prev_);
     r_prev_ = ref;
 

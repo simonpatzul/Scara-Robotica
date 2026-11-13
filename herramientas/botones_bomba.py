@@ -25,6 +25,8 @@ def mandar(c):
             estado.config(text='Pico desconectada, intenta otra vez')
             return
     resp = s.readline().decode(errors='ignore').strip()
+    if resp == 'ERR' or resp.count(',') == 3:   # contesta el firmware del robot (scara_fw), no prueba_bomba
+        resp = 'La Pico tiene scara_fw: carga prueba_bomba.uf2'
     estado.config(text=resp or 'sin respuesta de la Pico')
 
 
