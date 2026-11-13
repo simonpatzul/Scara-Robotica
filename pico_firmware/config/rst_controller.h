@@ -13,6 +13,7 @@ struct RstParams {
     double T[8];    // T(q^-1)
     double Am[3];   // denominador del modelo de referencia, el primer coeficiente es 1
     double Bm;      // numerador del modelo de referencia
+    bool posicional = false;   // true: u(k) = T[0] r(k) - R y(k) - S'(resto) u(k-1...), voltaje absoluto, sin integrador
 };
 
 class RstController {
@@ -23,6 +24,8 @@ public:
     float step(float ref, float y);        // un ciclo: devuelve u en voltios, ya saturado
 
 private:
+    float step_posicional(float ref);
+
     const RstParams& p_;
     double u_max_;
     double y_[5] = {};    // y(k), y(k-1), ... y(k-4)

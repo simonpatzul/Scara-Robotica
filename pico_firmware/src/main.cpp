@@ -1,14 +1,15 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/pwm.h"
 #include "axis.h"
 
-// ---------- Bomba (GP22, salida digital) y servo (GP26, PWM 50 Hz) ----------
+// ---------- Bomba (GP9, salida digital) y servo (GP8, PWM 50 Hz) ----------
 // Órdenes aparte de "r1,r2,p":  "B1" / "B0" = prender / apagar bomba,  "S<grados>" (0..180) = servo.
-const uint PIN_BOMBA = 22;
-const uint PIN_SERVO = 26;
+const uint PIN_BOMBA = 9;    // PCB nueva: PUMP_PWM (MOSFET Q2, 12 V)
+const uint PIN_SERVO = 8;    // PCB nueva: SERVO_PWM (servo a 5 V)
 
 void bomba_servo_init() {
     gpio_init(PIN_BOMBA);
@@ -23,7 +24,11 @@ void bomba_servo_init() {
 }
 
 void servo_grados(int grados) {
-    if (grados < 0) grados = 0;
+    if (grados < 0) {                          // "S-1": sin pulso, el servo se suelta y deja de pedir corriente
+        pwm_set_gpio_level(PIN_SERVO, 0);
+        printf("SERVO=OFF\n");
+        return;
+    }
     if (grados > 180) grados = 180;
     pwm_set_gpio_level(PIN_SERVO, 500 + grados * 2000 / 180);   // 0° = 500 us, 180° = 2500 us
     printf("SERVO=%d\n", grados);
@@ -80,6 +85,7 @@ char state_char(AxisState s) {
         case AxisState::Ready:  return 'R';
         case AxisState::Homing: return 'H';
         case AxisState::Fault:  return 'F';
+        case AxisState::Lifting: return 'L';
         default:                return 'D';
     }
 }
@@ -89,12 +95,12 @@ bool home(Axis& a) {
     a.start_homing();
     while (a.state() == AxisState::Homing) {
         printf("%s %-6s %8.4f rad | limite=%d | ciclos=%lu\n", a.name(),
-               a.homing_phase() == HomingPhase::Search ? "Search" : "GoTo",
+               a.homing_phase() == HomingPhase::Search ? "Search" : a.homing_phase() == HomingPhase::BackOff ? "BackOff" : a.homing_phase() == HomingPhase::Touch ? "Touch" : "GoTo",
                a.position_rad(), a.limit(), (unsigned long)loop_count);
         sleep_ms(100);
     }
     if (a.state() != AxisState::Ready) {
-        printf("%s: FALLA, el home tardo demasiado\n", a.name());
+        printf("%s: FALLA, %s\n", a.name(), a.fault_reason());
         return false;
     }
     printf("%s: HOME OK. Posicion = %.4f rad\n", a.name(), a.position_rad());
@@ -109,9 +115,33 @@ int main() {
 
     sleep_ms(3000);                     // tiempo para abrir el monitor serie
     printf("\n=== Home de %d ejes, uno por uno ===\n", N_AXES);
-    printf("Presiona ENTER para iniciar. Mantén la mano cerca del E-stop.\n");
-    int c;
-    do { c = getchar(); } while (c != '\n' && c != '\r');
+    // Solo la línea HOME lo arranca: los objetivos "r1,r2,p" que siga mandando el PC no deben disparar un home tras un reinicio.
+    // El aviso se repite porque el PC reconoce el reinicio con él, y puede no estar escuchando en ese momento.
+    char pedido[48];
+    int m = 0;
+    absolute_time_t aviso = get_absolute_time();
+    // CODO = prueba: sube P y hace el home solo del codo (con el hombro sin home); luego se queda quieto
+    bool solo_codo = false;
+    while (!(poll_line(pedido, sizeof(pedido), m) && (strcmp(pedido, "HOME") == 0 || (solo_codo = strcmp(pedido, "CODO") == 0)))) {
+        if (time_reached(aviso)) {
+            printf("Escribe HOME y Enter para iniciar. Mantén la mano cerca del E-stop.\n");
+            aviso = make_timeout_time_ms(1000);
+        }
+        sleep_ms(10);
+    }
+
+    // Antes de mover el brazo, subir P (sin home: por tiempo y lo que marque el encoder) para no arrastrar la
+    // ventosa por la caja o el piso. Se detiene a los 25 mm, a los 6 s o si se traba arriba
+    printf("Subiendo P antes del home...\n");
+    axes[2].start_lift(8.0f, 25.0f, 6000);
+    while (axes[2].state() == AxisState::Lifting) sleep_ms(50);
+    printf("P subio %.1f mm\n", axes[2].lift_moved());
+
+    if (solo_codo) {
+        home(axes[0]);
+        printf("Prueba del codo terminada: reinicia la Pico para el home completo\n");
+        while (true) sleep_ms(1000);
+    }
 
     // Orden del home: hombro (R2) primero, luego codo (R1) y al final P
     Axis* orden[] = { &axes[1], &axes[0], &axes[2] };

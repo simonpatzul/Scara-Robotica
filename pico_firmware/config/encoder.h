@@ -12,9 +12,9 @@ public:
     void init();             // configura pines y arranca la SM
     int32_t count() const;   // cuentas desde el último reset()
     void reset();            // la posición actual pasa a ser 0
-
+    void reset_at(int32_t raw_cero) { offset_ = raw_cero; }   // el 0 queda donde estaba en esa lectura
+    int32_t raw() const;     // conteo sin offset
 private:
-    int32_t raw() const;
 
     PIO pio_;
     uint sm_;

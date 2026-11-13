@@ -13,6 +13,7 @@ MotorDriver::MotorDriver(uint pwm_l, uint pwm_r, uint en_l, uint en_r, float max
 void MotorDriver::init() {
     // 1. Enables como salida y en bajo: el puente queda deshabilitado
     for (uint pin : {en_l_, en_r_}) {
+        if (pin == 0xFF) continue;   // sin pin de enable: lo maneja otra placa
         gpio_init(pin);
         gpio_set_dir(pin, GPIO_OUT);
         gpio_put(pin, 0);
@@ -39,8 +40,8 @@ void MotorDriver::init() {
 
 void MotorDriver::enable(bool on) {
     if (!on) set(0.0f);              // primero PWM a 0, después se cierra el enable
-    gpio_put(en_l_, on);
-    gpio_put(en_r_, on);
+    if (en_l_ != 0xFF) gpio_put(en_l_, on);
+    if (en_r_ != 0xFF) gpio_put(en_r_, on);
 }
 
 void MotorDriver::set(float duty) {
