@@ -41,6 +41,7 @@ struct AxisConfig {
                                     // 0 = un solo toque y GoTo a home_volts
     float vel_max = 1.0f;           // el objetivo que sigue el RST avanza a esta velocidad como mucho (rad/s, o mm/s en P):
                                     // sin esto un salto de objetivo arranca los ejes a tope a la vez y el pico de corriente cuelga la Pico
+    uint8_t limit_pin2 = NO_PIN;    // segundo final en el mismo extremo (activo en bajo): cualquiera de los dos cuenta como límite
 };
 
 constexpr uint32_t CONTROL_PERIOD_US = 10000;  // Ts = 10 ms, el mismo de la identificación
@@ -60,6 +61,6 @@ constexpr AxisConfig AXIS_R1 = { "R1", 12, 13, 0, 3200.0f, 3.0f, -1.0f,  3,   2,
 // 13-11, finales apretados a mano en orden hombro, codo, P: dieron GP19, GP18, GP17. Codo = GP18 y P = GP17.
 constexpr AxisConfig AXIS_R2 = { "R2", 10, 11, 1, 3200.0f, 3.0f, -1.0f,  1,   0, NO_PIN, NO_PIN, 12.0f, 0.50f,    19,    true,   -3.0f,  1.48f,  30000, &RST_ACTIVO, -1.46f, 1.5708f, true, 2.5f };  // HOMBRO, motor en P1
 
-// Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo. Hasta 50 mm (máximo mecánico).
+// Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo: GP20 o GP17 (dos finales por seguridad). Hasta 50 mm (máximo mecánico).
 // pwmL/pwmR cruzados como en la PCB (M3_INA = GP7, M3_INB = GP6).
-constexpr AxisConfig AXIS_P  = { "P",  14, 15, 2, 3200.0f, 3.14159265f, -1.0f,  7,  6, NO_PIN, NO_PIN, 12.0f, 1.00f,   17,    true,   -8.0f,  0.0f,   30000, &RST_ACTIVO, 0.0f, 50.0f, false, 0.0f, 20.0f };
+constexpr AxisConfig AXIS_P  = { "P",  14, 15, 2, 3200.0f, 3.14159265f, -1.0f,  7,  6, NO_PIN, NO_PIN, 12.0f, 1.00f,   20,    true,   -8.0f,  0.0f,   30000, &RST_ACTIVO, 0.0f, 50.0f, false, 0.0f, 20.0f, 17 };

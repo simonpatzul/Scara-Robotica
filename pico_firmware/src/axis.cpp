@@ -17,12 +17,14 @@ Axis::Axis(const AxisConfig& cfg)
       encoder_(pio0, cfg.pio_sm, cfg.enc_a, cfg.enc_b),
       driver_(cfg.pwm_l, cfg.pwm_r, cfg.en_l, cfg.en_r, cfg.max_duty),
       limit_(cfg.limit_pin, cfg.limit_active_low),
+      limit2_(cfg.limit_pin2, true),
       rst_(*cfg.rst, cfg.max_duty * cfg.supply_volts) {}   // el RST satura igual que el driver
 
 void Axis::init() {
     driver_.init();    // primero el driver, para que el motor esté apagado cuanto antes
     encoder_.init();
     limit_.init();
+    if (cfg_.limit_pin2 != NO_PIN) limit2_.init();
 }
 
 void Axis::update() {
@@ -51,7 +53,7 @@ void Axis::update() {
     else if (state_ == AxisState::Homing) homing_step();
     else if (state_ == AxisState::Ready) {
         // Tope: con el final de carrera presionado no se empuja hacia él, pero sí se puede salir en sentido contrario
-        limit_ticks_ = limit_.pressed() ? limit_ticks_ + 1 : 0;
+        limit_ticks_ = en_limite() ? limit_ticks_ + 1 : 0;
         const float hacia = cfg_.home_volts > 0.0f ? 1.0f : -1.0f;   // el signo de home_volts lleva hacia el límite
         // Solo si el objetivo apunta al límite: con el objetivo hacia afuera el RST trabaja normal, o el eje quedaría atrapado
         // Rampa: el objetivo del RST se acerca a target_rad_ sin saltos
@@ -135,7 +137,7 @@ void Axis::begin_homing() {
     state_ = AxisState::Homing;
     limit_ticks_ = 0;
     search_start_ = position_rad_;
-    if (limit_.pressed()) {
+    if (en_limite()) {
         first_press_raw_ = encoder_.raw();
         phase_ = HomingPhase::Search;
         sobre_limite();                                  // ya está sobre el límite: cero ahí, o alejarse y volver lento
@@ -185,7 +187,7 @@ void Axis::homing_step() {
             return;
         }
         // Solo cuenta si el límite sigue presionado LIMIT_TICKS ciclos seguidos; un pico de ruido no detiene la búsqueda
-        limit_ticks_ = limit_.pressed() ? limit_ticks_ + 1 : 0;
+        limit_ticks_ = en_limite() ? limit_ticks_ + 1 : 0;
         if (limit_ticks_ == 1) first_press_raw_ = encoder_.raw();
         if (limit_ticks_ >= LIMIT_TICKS) { sobre_limite(); return; }
         if (phase_ == HomingPhase::Touch) {
@@ -209,7 +211,7 @@ void Axis::homing_step() {
         if (encoder_muerto(cfg_.home_slow_volts, 0.0f)) { fail("el encoder no cuenta alejandose del limite"); return; }
         if (sin_avance()) { fail("no se aleja del limite (voltaje lento muy bajo)"); return; }
         if (!soltado_) {
-            limit_ticks_ = limit_.pressed() ? 0 : limit_ticks_ + 1;   // LIMIT_TICKS lecturas seguidas suelto
+            limit_ticks_ = en_limite() ? 0 : limit_ticks_ + 1;   // LIMIT_TICKS lecturas seguidas suelto
             if (limit_ticks_ >= LIMIT_TICKS) { soltado_ = true; soltado_en_ = position_rad_; }
         } else if ((soltado_en_ - position_rad_) * hacia >= BACKOFF_RAD) {
             driver_.set(0.0f);

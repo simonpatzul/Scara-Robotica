@@ -30,7 +30,7 @@ public:
     const char* fault_reason() const { return fault_reason_; }
     float lift_moved() const { return lift_moved_; }   // cuánto subió (positivo = en el sentido pedido)
     HomingPhase homing_phase() const { return phase_; }
-    bool limit() const { return limit_.pressed(); }
+    bool limit() const { return en_limite(); }
     float position_rad() const { return position_rad_; }   // ángulo de la articulación
     float target_rad() const { return target_rad_; }
     float voltage() const { return u_volts_; }              // última salida del RST, en voltios
@@ -45,12 +45,14 @@ private:
     bool encoder_muerto(float volts, float umbral);   // true si lleva 0.25 s empujando con 'volts' (>= umbral) sin que el encoder cuente
     bool sin_avance();                  // true si en el último segundo casi no se movió (motor que no vence la fricción)
     void reset_avance() { avance_ticks_ = 0; avance_ref_ = position_rad_; quiet_ticks_ = 0; }
+    bool en_limite() const { return limit_.pressed() || (cfg_.limit_pin2 != NO_PIN && limit2_.pressed()); }
     void sobre_limite();                // el límite quedó presionado LIMIT_TICKS ciclos en Search o Touch
 
     const AxisConfig& cfg_;
     Encoder encoder_;
     MotorDriver driver_;
     LimitSwitch limit_;
+    LimitSwitch limit2_;
     RstController rst_;
 
     // Solo los usa el núcleo 1
