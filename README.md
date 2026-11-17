@@ -1,41 +1,51 @@
 # SCARA Robótica
 
-SCARA RRP: firmware de la Raspberry Pi Pico + workspace de ROS 2 Jazzy.
+SCARA RRP v2 (PCB con Pico RP2040 + STM32 + drivers IFX007T): firmware, ROS 2 Jazzy y SCADA por MQTT.
 
-- `pico_firmware/` – firmware de la Pico (basado en jer0valencia/SCARA_RRP_)
-- `ros2_ws/` – paquetes `scara_description` y `scara_pc` (basado en jer0valencia/SCARA_RRP)
-- `herramientas/` – `home.sh` (reinicia la Pico y hace el home), pruebas de finales de carrera y de ejes
+## Carpetas
+| Carpeta | Qué hay |
+|---|---|
+| `firmware/pico/` | firmware de la Pico: `src/` y `config/` (scara_fw: RST, home, encoders) y `pruebas/` (programas de prueba) |
+| `firmware/stm32/` | firmware del STM32 (WiFi FC41, EN de los drivers) y `grabar_stm32.bat` |
+| `firmware/arduino/` | versiones Arduino de referencia (`scara_rst`, `scara_prueba_pines`) |
+| `bajo_nivel/` | PC ↔ robot: `home.sh`, `subir_controlador.sh`, `pruebas/` (ejes, servo, bomba, finales) y `control_rst/` (diseño del RST) |
+| `alto_nivel/` | `ros2_ws/` (bridge, ik, p2p, teleop, URDF), `secuencias/` (caja → bandeja) y `gemelo/` (RViz) |
+| `mqtt_scada/` | `puente/` (ROS 2 → MQTT), `web_local/` (página SCADA local) y `servidor/` (backend Node + simulador) |
+| `docs/` | notas de cambios y problemas |
 
 ## Compilar
 Firmware (necesita Pico SDK y el compilador ARM):
 ```bash
 export PICO_SDK_PATH=~/pico/pico-sdk PICO_TOOLCHAIN_PATH=~/pico/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi
-cmake -S pico_firmware -B pico_firmware/build && cmake --build pico_firmware/build -j
+cmake -S firmware/pico -B firmware/pico/build && cmake --build firmware/pico/build -j
 ```
-Cargar: conectar la Pico con BOOTSEL y copiar `pico_firmware/build/scara_fw.uf2` a `RPI-RP2`.
+`bajo_nivel/home.sh` carga `firmware/pico/build/scara_fw.uf2` solo (sin BOOTSEL).
 
 ROS 2:
 ```bash
-cd ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build
+cd alto_nivel/ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build
 ```
 
 ## Usar
-1. Home (deja el brazo recto antes si el bridge está corriendo):
+1. Home (recarga el firmware y deja corriendo el bridge):
 ```bash
-herramientas/home.sh
+bajo_nivel/home.sh
 ```
-2. En otra terminal:
+2. En otra terminal, cuando diga LISTO:
 ```bash
-source /opt/ros/jazzy/setup.bash && source ros2_ws/install/setup.bash
+source /opt/ros/jazzy/setup.bash && source alto_nivel/ros2_ws/install/setup.bash
 ros2 run scara_pc p2p      # escribir: x y p (mm)
 ros2 run scara_pc teleop   # Q/A codo, W/S hombro, E/D prismático
+alto_nivel/secuencias/secuencia.sh   # caja -> bandeja
 ```
+Página SCADA local: `python3 mqtt_scada/web_local/scada_web.py` y abrir http://localhost:8765
 
-## Pines (baquela)
-| Eje | PWM (L,R) | EN (L,R) | Encoder | Final de carrera |
-|---|---|---|---|---|
-| R1 codo | GP4, GP5 | GP7, GP6 | GP11, GP10 | GP19 |
-| R2 hombro | GP0, GP1 | GP3, GP2 | GP12, GP13 | GP21 |
-| P | GP14, GP15 | GP17, GP16 | GP8, GP9 | GP20 |
+## Pines (PCB v2)
+| Eje | IN (A,B) | Encoder (A,B) | Final de carrera |
+|---|---|---|---|
+| R1 codo | GP3, GP2 | GP12, GP13 | GP18 |
+| R2 hombro | GP1, GP0 | GP10, GP11 | GP19 |
+| P | GP7, GP6 | GP14, GP15 | GP20 y GP17 (abajo) |
 
-Finales de carrera NO a GND con pull-up. Home: hombro → codo → P.
+Servo GP8, bomba GP9. Los EN de los drivers los maneja el STM32. Finales activos en bajo con pull-up.
+Home: P sube 25 mm → hombro → codo → P.

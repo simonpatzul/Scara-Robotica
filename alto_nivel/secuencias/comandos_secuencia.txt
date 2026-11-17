@@ -1,0 +1,54 @@
+COMANDOS PARA CORRER LA SECUENCIA DEL SCARA (Estación 1)
+=========================================================
+
+Antes de empezar
+----------------
+- Fuente de 12 V de los motores encendida.
+- Pico conectada por USB.
+- 4 tarjetas en la pila de la caja y la bandeja vacía en su lugar.
+- (Opcional) Que la laptop no se suspenda mientras pruebas. Déjalo corriendo en una terminal aparte:
+
+systemd-inhibit --what=sleep:idle --why="robot SCARA" sleep infinity
+
+
+1. Cerrar el bridge anterior (si hay uno abierto)
+-------------------------------------------------
+pkill -INT -f "scara_pc/bridge"
+
+
+2. Reiniciar la Pico y cargar el firmware (así vuelve a hacer el home)
+---------------------------------------------------------------------
+Espera a que aparezca el puerto, la pasa a modo de carga y copia scara_fw. Debe terminar diciendo "cargado".
+
+for i in $(seq 1 15); do ls /dev/ttyACM* >/dev/null 2>&1 && break; sleep 1; done; P=$(ls /dev/ttyACM* | head -1); python3 -c "import serial; serial.Serial('$P',1200).close()"; for i in $(seq 1 15); do [ -d /media/$USER/RPI-RP2 ] && break; sleep 1; done; sleep 2; cp ~/scara_ws/SCARA_Robotica/firmware/pico/build/scara_fw.uf2 /media/$USER/RPI-RP2/ && sync && echo cargado
+
+Si la Pico ya está en modo de carga (aparece la unidad RPI-RP2), basta con:
+
+cp ~/scara_ws/SCARA_Robotica/firmware/pico/build/scara_fw.uf2 /media/$USER/RPI-RP2/ && sync
+
+
+3. Home (terminal 1, dejarlo corriendo)
+---------------------------------------
+Espera unos 3 s después de "cargado". El bridge hace el home (R2, R1, P) y debe decir LISTO.
+Revisa que P toque su final de carrera.
+
+cd ~/scara_ws/SCARA_Robotica && source /opt/ros/jazzy/setup.bash && source alto_nivel/ros2_ws/install/setup.bash && ros2 run scara_pc bridge --ros-args -p port:=$(ls /dev/ttyACM* | head -1)
+
+
+4. Secuencia (terminal 2)
+-------------------------
+Cuando el bridge diga LISTO:
+
+cd ~/scara_ws/SCARA_Robotica && source /opt/ros/jazzy/setup.bash && source alto_nivel/ros2_ws/install/setup.bash && python3 alto_nivel/secuencias/secuencia_caja.py
+
+Para repetirla, vuelve a acomodar las tarjetas y corre solo el paso 4 (el home ya está hecho).
+
+
+Notas
+-----
+- El home solo se hace cuando la Pico arranca. Para repetirlo: pasos 1, 2 y 3.
+- Si el bridge se queda en "Haciendo home..." sin avanzar, la Pico no se reinició: repite el paso 2.
+- Si el USB se cae a media secuencia, el bridge se reconecta solo y sigue.
+- Para mover un servo o la bomba a mano (con el bridge corriendo):
+    ros2 topic pub --once /scara/bomba std_msgs/msg/Bool "{data: false}"
+    ros2 topic pub --once /scara/servo std_msgs/msg/Float64 "{data: 0.0}"
