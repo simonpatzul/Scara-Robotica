@@ -4,10 +4,10 @@
 #include <cstdio>
 #include "pico/stdlib.h"
 
-// Encoders: R1 codo 12/13, R2 hombro 10/11, P 14/15. Finales: codo 17, P 18, hombro 19 (activos en bajo, con pull-up como en scara_fw)
-const uint PINES[] = { 12, 13, 10, 11, 14, 15, 17, 18, 19 };
-const char* NOMBRES[] = { "codoA", "codoB", "hombA", "hombB", "P_A", "P_B", "fin17", "fin18", "fin19" };
-constexpr int N = 9;
+// Encoders: R1 codo 12/13, R2 hombro 10/11, P 14/15. Finales: P 17 y 20, codo 18, hombro 19 (activos en bajo, con pull-up como en scara_fw)
+const uint PINES[] = { 12, 13, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22 };
+const char* NOMBRES[] = { "codoA", "codoB", "hombA", "hombB", "P_A", "P_B", "fin16", "fin17", "fin18", "fin19", "fin20", "fin21", "fin22" };
+constexpr int N = 13;
 volatile uint32_t flancos[32];
 
 // Entradas de los puentes en bajo = motores quietos (los EN los maneja el STM32): M1 0/1, M2 2/3, M3 6/7
@@ -25,7 +25,7 @@ int main() {
     for (int i = 0; i < N; ++i) {
         gpio_init(PINES[i]);
         gpio_set_dir(PINES[i], GPIO_IN);
-        if (PINES[i] >= 17) gpio_pull_up(PINES[i]);
+        if (PINES[i] >= 16) gpio_pull_up(PINES[i]);
         else gpio_disable_pulls(PINES[i]);   // encoders sin pull (como INPUT en scara_rst.ino): el TXS0108E ya trae los suyos
         gpio_set_irq_enabled_with_callback(PINES[i], GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &al_cambiar);
     }

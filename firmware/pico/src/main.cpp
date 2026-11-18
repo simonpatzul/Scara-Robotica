@@ -130,12 +130,9 @@ int main() {
         sleep_ms(10);
     }
 
-    // Antes de mover el brazo, subir P (sin home: por tiempo y lo que marque el encoder) para no arrastrar la
-    // ventosa por la caja o el piso. Se detiene a los 25 mm, a los 6 s o si se traba arriba
-    printf("Subiendo P antes del home...\n");
-    axes[2].start_lift(8.0f, 25.0f, 6000);
-    while (axes[2].state() == AxisState::Lifting) sleep_ms(50);
-    printf("P subio %.1f mm\n", axes[2].lift_moved());
+    // P primero: su home sube hasta el final de arriba (GP20), así la ventosa no se arrastra por la caja o el piso
+    printf("Home de P: sube hasta el final de arriba...\n");
+    if (!home(axes[2])) while (true) sleep_ms(1000);
 
     if (solo_codo) {
         home(axes[0]);
@@ -143,8 +140,8 @@ int main() {
         while (true) sleep_ms(1000);
     }
 
-    // Orden del home: hombro (R2) primero, luego codo (R1) y al final P
-    Axis* orden[] = { &axes[1], &axes[0], &axes[2] };
+    // Luego hombro (R2) y codo (R1)
+    Axis* orden[] = { &axes[1], &axes[0] };
     for (Axis* a : orden) {
         if (!home(*a)) while (true) sleep_ms(1000);   // si un eje falla, no se sigue
     }

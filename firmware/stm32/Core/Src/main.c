@@ -128,6 +128,7 @@ int main(void)
     // Proteccion y envio MQTT
     scara_proteccion();
     if (isWifiReady() != 0) {
+      scara_comandos();
       scara_publicar();
     }
   }

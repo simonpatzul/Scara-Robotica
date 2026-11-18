@@ -23,6 +23,7 @@ JOINTS = ['joint_r1', 'joint_r2', 'joint_p']
 SIN_RESPUESTA_S = 1.0   # sin respuesta de la Pico por este tiempo = USB caído, se reconecta
 ESPERA_REINICIO_S = 4.0   # tras reconectar solo se escucha: una Pico reiniciada pide HOME cada segundo desde los 3 s de arrancar
 AVISO_HOME = 'Escribe HOME'
+P_HOME = 51.0             # mm: donde queda P al terminar el home (final de arriba, GP20; axis_config.h)
 SEGURA_R1, SEGURA_R2, SEGURA_P = -1.83, -1.49, 30.0   # ESTACIONAR y P_CAJA de secuencia_caja.py
 T_TRAMO_S = 2.0           # cada tramo hacia la posición segura, como T_SUAVE
 SILENCIO_S = 1.0          # ya en la posición segura, /scara/target se vuelve a oír cuando deje de llegar este tiempo
@@ -37,7 +38,8 @@ class Bridge(Node):
         self.ser = serial.Serial(port, 115200, timeout=1.0)
         self.home()
 
-        self.target = [0.0, 0.0, 0.0]   # después del home los tres ejes quedan en 0
+        # Después del home R1 y R2 quedan en 0 y P arriba, en su final (51 mm): mandarle 0 lo bajaría hasta el fondo
+        self.target = [0.0, 0.0, P_HOME]
         self.ult_resp = time.monotonic()   # última respuesta válida de la Pico
         self.medido = None                 # última posición que contestó la Pico
         self.t_reconexion = None           # cuándo se reabrió el puerto, mientras se escucha sin mandar nada

@@ -5,9 +5,9 @@
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 source /opt/ros/jazzy/setup.bash
 
-# Si el bridge está corriendo, primero llevar el brazo recto (0,0,0) para que el home no choque
+# Si el bridge está corriendo, primero llevar el brazo recto para que el home no choque: P sube primero y se queda arriba
 if pgrep -f "scara_pc/bridge" >/dev/null; then
-  echo "Llevando el brazo a 0,0,0 antes del home: hombro, codo y al final P..."
+  echo "Llevando el brazo recto antes del home: sube P, luego hombro y codo..."
   python3 - <<'EOF'
 import time
 import rclpy
@@ -22,8 +22,9 @@ t0 = time.time()
 while m[0] is None and time.time() - t0 < 3:
     rclpy.spin_once(n, timeout_sec=0.1)
 if m[0] is not None:   # [R1 codo, R2 hombro, P]
-    r1, _, p = m[0][:3]
-    for objetivo, seg in (([r1, 0.0, p], 4), ([0.0, 0.0, p], 4), ([0.0, 0.0, 0.0], 8)):
+    r1, r2, p = m[0][:3]
+    ARRIBA = max(p, 50.0)   # mm: P sube a 50 o se queda donde está si ya está más arriba; aquí nunca baja
+    for objetivo, seg in (([r1, r2, ARRIBA], 8), ([r1, 0.0, ARRIBA], 4), ([0.0, 0.0, ARRIBA], 4)):
         t0 = time.time()
         while time.time() - t0 < seg:
             pub.publish(Float64MultiArray(data=objetivo))

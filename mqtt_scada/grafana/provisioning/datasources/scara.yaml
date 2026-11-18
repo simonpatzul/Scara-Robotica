@@ -1,0 +1,15 @@
+# Base de datos del SCADA (la que llena server.js). El dashboard y las alertas la buscan por uid: scara-pg
+apiVersion: 1
+datasources:
+  - name: SCARA PostgreSQL
+    uid: scara-pg
+    type: grafana-postgresql-datasource
+    url: localhost:5433
+    user: postgres
+    jsonData:
+      database: scara
+      sslmode: disable
+      postgresVersion: 1800
+      timescaledb: false
+    secureJsonData:
+      password: TU_CONTRASENA   # la misma de server.js

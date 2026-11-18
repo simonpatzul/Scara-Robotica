@@ -42,6 +42,8 @@ struct AxisConfig {
     float vel_max = 1.0f;           // el objetivo que sigue el RST avanza a esta velocidad como mucho (rad/s, o mm/s en P):
                                     // sin esto un salto de objetivo arranca los ejes a tope a la vez y el pico de corriente cuelga la Pico
     uint8_t limit_pin2 = NO_PIN;    // segundo final en el mismo extremo (activo en bajo): cualquiera de los dos cuenta como límite
+    float home_pos = 0.0f;          // posición que vale el eje al terminar el home (P: hace el home arriba, en su máximo)
+    uint8_t fin_pin = NO_PIN;       // final del otro extremo (activo en bajo): con él apretado no se empuja hacia allá
 };
 
 constexpr uint32_t CONTROL_PERIOD_US = 10000;  // Ts = 10 ms, el mismo de la identificación
@@ -55,12 +57,17 @@ constexpr uint32_t CONTROL_PERIOD_US = 10000;  // Ts = 10 ms, el mismo de la ide
 // El objetivo nunca llega al final: el mínimo queda 0.02 rad antes (y el tope del final lo detiene igual).
 // Signos de encoder probados en el robot: el 09-11 el hombro giró hacia su final y el encoder decía lo contrario; el 10-11 el codo igual.
 //                              name  encA encB sm  cuentas  ratio  sign  pwmL pwmR  enL     enR    volts  maxDuty  limite activeLow homeV  objetivo timeout
-constexpr AxisConfig AXIS_R1 = { "R1", 12, 13, 0, 3200.0f, 3.0f, -1.0f,  3,   2, NO_PIN, NO_PIN, 12.0f, 0.50f,    18,    true,   -3.0f,  1.83f,  30000, &RST_ACTIVO, -1.81f, 1.885f, true, 2.5f };   // CODO, motor en P2
+// PRUEBA 18-11: conectores de motor y encoder del codo y del hombro cruzados en la PCB -> pines cruzados aquí.
+// Para volver: R1 = 12, 13 / PWM 3, 2 y R2 = 10, 11 / PWM 1, 0.
+constexpr AxisConfig AXIS_R1 = { "R1", 10, 11, 0, 3200.0f, 3.0f, -1.0f,  1,   0, NO_PIN, NO_PIN, 12.0f, 0.50f,    18,    true,   -3.0f,  1.83f,  30000, &RST_ACTIVO, -1.81f, 1.885f, true, 2.5f };   // CODO, motor en P2
 // 13-11 (scara_prueba_pines con los 5 V ya en 5 V): GP1 lleva el hombro a su final (GP19), GP3 el codo hacia el suyo
 // y GP6 sube P. El encoder de P cuenta al reves que los otros dos respecto a su voltaje positivo: signo -1.
 // 13-11, finales apretados a mano en orden hombro, codo, P: dieron GP19, GP18, GP17. Codo = GP18 y P = GP17.
-constexpr AxisConfig AXIS_R2 = { "R2", 10, 11, 1, 3200.0f, 3.0f, -1.0f,  1,   0, NO_PIN, NO_PIN, 12.0f, 0.50f,    19,    true,   -3.0f,  1.48f,  30000, &RST_ACTIVO, -1.46f, 1.5708f, true, 2.5f };  // HOMBRO, motor en P1
+// 17-11, recableados: hombro = GP17, codo = GP18, P abajo = GP19 y P arriba = GP20 (prueba_pines y prueba_finales_p).
+constexpr AxisConfig AXIS_R2 = { "R2", 12, 13, 1, 3200.0f, 3.0f, -1.0f,  3,   2, NO_PIN, NO_PIN, 12.0f, 0.50f,    17,    true,   -3.0f,  1.48f,  30000, &RST_ACTIVO, -1.46f, 1.5708f, true, 2.5f };  // HOMBRO, motor en P1
 
-// Prismático: sus "rad" son mm (0 = suelo, positivo hacia arriba). Límite abajo, en el suelo: GP20 o GP17 (dos finales por seguridad). Hasta 50 mm (máximo mecánico).
+// Prismático: sus "rad" son mm (0 = final de abajo, positivo hacia arriba). El home sube hasta el final de arriba (GP20), que vale 51 mm.
+// Final de abajo en GP19: bajando, P se para en él. prueba_finales_p (17-11, a 6 V): 50.3 mm subiendo y 51.7 mm bajando entre
+// los dos finales, unos 51 mm. Órdenes de 0 a 51 mm: al terminar el home se queda arriba.
 // pwmL/pwmR cruzados como en la PCB (M3_INA = GP7, M3_INB = GP6).
-constexpr AxisConfig AXIS_P  = { "P",  14, 15, 2, 3200.0f, 3.14159265f, -1.0f,  7,  6, NO_PIN, NO_PIN, 12.0f, 1.00f,   20,    true,   -8.0f,  0.0f,   30000, &RST_ACTIVO, 0.0f, 50.0f, false, 0.0f, 20.0f, 17 };
+constexpr AxisConfig AXIS_P  = { "P",  14, 15, 2, 3200.0f, 3.14159265f, -1.0f,  7,  6, NO_PIN, NO_PIN, 12.0f, 1.00f,   20,    true,    8.0f,  0.0f,   30000, &RST_ACTIVO, 0.0f, 51.0f, true, 0.0f, 20.0f, NO_PIN, 51.0f, 19 };

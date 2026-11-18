@@ -17,17 +17,17 @@ from sensor_msgs.msg import JointState
 from scara_pc.ik import ik
 
 N_PLACAS = 4
-A0 = 3.0             # piso de la caja (mm)
+A0 = 4.8             # piso de la caja (mm), con el cero nuevo de P: la ventosa toca la tarjeta de arriba en P = 10.8 (2026-11-18)
 ESPESOR = 1.5        # cada placa (mm)
-CAJA = (-200.0, 145.0)   # punto de la caja calibrado en el robot (2026-11-03)
+CAJA = (-202.0, 159.7)   # punto de la caja calibrado con el teleop (2026-11-18)
 # Cuadro de 2 x 2, centro en (25, 225). Tarjetas de 38 x 38 mm a 50 mm: quedan 12 mm entre una y otra
 BANDEJA = [(1.5, 195.5), (50.5, 195.5), (1.5, 241.5), (50.5, 241.5)]
 P_CAJA = 30.0        # altura para entrar y salir de la caja (piso 3 + 4 tarjetas = 9 mm; subir si las paredes son más altas)
 P_APROX = 25.0       # altura para llegar y salir del punto de soltar en el suelo
 BAJAR_EXTRA = 1.5     # al coger, baja esto más que la altura calculada de la tarjeta (si toca antes, se detiene ahí)
-P_SUELO = 6.0        # suelta la tarjeta a 6 mm, sobre la bandeja (no baja hasta el piso del hueco)
+P_SUELO = 7.8        # suelta la tarjeta a 7.8 mm (6 + 1.8 del cero nuevo de P), sobre la bandeja (no baja hasta el piso del hueco)
 SUBIR_TARJETA = 15.0  # con la tarjeta: sube esto sobre la altura donde la cogió y sale hacia el punto de soltar
-P_SALIR_SUELO = 12.0  # después de soltar: sale hacia la caja cuando P pasa esta altura (en el suelo solo hay tarjetas de 1.5 mm)
+P_SALIR_SUELO = 13.8  # (12 + 1.8 del cero nuevo de P) después de soltar: sale hacia la caja cuando P pasa esta altura (en el suelo solo hay tarjetas de 1.5 mm)
 P_PASO = 25.0        # al subir, el brazo arranca hacia el siguiente punto cuando P pasa esta altura y sigue subiendo mientras viaja
 GIRO_PILA = 90       # la tarjeta 2 está girada 90° en horario respecto a la 1 (-90 si es antihorario)
 SIGNO_SERVO = 1      # cambiar a -1 si la tarjeta queda girada al revés
@@ -188,7 +188,10 @@ def esperar_servo():
 
 
 # Calcular todo antes de mover nada: si un punto no se alcanza, no arranca
-c1, c2, ang_coger = articulaciones(*CAJA)
+# En la caja, el codo que se midió con el teleop (2026-11-18): articulaciones() elegiría el otro lado (hombro en 1.27 rad)
+CAJA_ART = (-0.6813, 0.5315)   # (R1 codo, R2 hombro) con la ventosa sobre la pila
+c1, c2 = CAJA_ART
+ang_coger = -c2 + c1           # ángulo del brazo: q1 + q2 con q1 = -R2, q2 = R1 (como en articulaciones)
 plan = []
 for i in range(N_PLACAS):
     altura = A0 + ESPESOR * (N_PLACAS - i)

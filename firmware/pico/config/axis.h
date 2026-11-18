@@ -42,9 +42,11 @@ private:
     void zero_here();   // el punto actual pasa a ser 0 y empieza la fase GoTo
     void fail(const char* reason);
     void lift_step();
+    void salida(float duty);   // driver_.set, pero sin empujar nunca contra el final apretado
     bool encoder_muerto(float volts, float umbral);   // true si lleva 0.25 s empujando con 'volts' (>= umbral) sin que el encoder cuente
     bool sin_avance();                  // true si en el último segundo casi no se movió (motor que no vence la fricción)
     void reset_avance() { avance_ticks_ = 0; avance_ref_ = position_rad_; quiet_ticks_ = 0; }
+    bool en_fin() const { return cfg_.fin_pin != NO_PIN && fin_.pressed(); }
     bool en_limite() const { return limit_.pressed() || (cfg_.limit_pin2 != NO_PIN && limit2_.pressed()); }
     void sobre_limite();                // el límite quedó presionado LIMIT_TICKS ciclos en Search o Touch
 
@@ -53,6 +55,7 @@ private:
     MotorDriver driver_;
     LimitSwitch limit_;
     LimitSwitch limit2_;
+    LimitSwitch fin_;
     RstController rst_;
 
     // Solo los usa el núcleo 1
@@ -61,6 +64,9 @@ private:
     uint32_t ticks_ = 0;          // ciclos desde que empezó el home (para el timeout)
     uint32_t pause_ticks_ = 0;    // ciclos que faltan de pausa antes de ir al objetivo
     uint32_t limit_ticks_ = 0;    // lecturas seguidas del límite presionado en la búsqueda (filtra ruido)
+    float duty_ = 0.0f;           // la última salida al motor (de -1 a 1)
+    uint32_t fin_ticks_ = 0;      // lecturas seguidas del final del otro extremo apretado
+    uint32_t guarda_ticks_ = 0;   // lecturas seguidas del final apretado, para salida() (en todos los estados)
     int32_t first_press_raw_ = 0; // conteo en la primera de esas lecturas: ahí va el cero
     float search_start_ = 0.0f;   // dónde empezó la búsqueda (para ver si va hacia el límite)
     int32_t last_count_ = 0;      // para ver si el encoder cuenta mientras el motor empuja

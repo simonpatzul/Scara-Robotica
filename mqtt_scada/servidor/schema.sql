@@ -22,3 +22,19 @@ CREATE TABLE IF NOT EXISTS eventos (
   falla      VARCHAR(12),
   corriente  REAL
 );
+
+-- Comandos: lo que se mando desde Grafana (origen = grafana) y lo que contesto el robot (origen = respuesta)
+CREATE TABLE IF NOT EXISTS comandos (
+  id      SERIAL PRIMARY KEY,
+  ts      TIMESTAMPTZ DEFAULT now(),
+  origen  VARCHAR(12),
+  texto   VARCHAR(200)
+);
+
+-- Posicion: una fila por cada scara/pos (cada 500 ms, la manda el nodo mqtt_cmd del PC)
+CREATE TABLE IF NOT EXISTS posicion (
+  id      SERIAL PRIMARY KEY,
+  ts      TIMESTAMPTZ DEFAULT now(),
+  r1 REAL, r2 REAL, p REAL, x REAL, y REAL,
+  parado  BOOLEAN
+);

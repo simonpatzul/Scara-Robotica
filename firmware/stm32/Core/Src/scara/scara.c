@@ -9,6 +9,7 @@
 #include "../timer/timer.h"
 #include "main.h"
 #include <stdio.h>
+#include <string.h>
 
 extern ADC_HandleTypeDef hadc;
 
@@ -41,6 +42,8 @@ char falla[3];                      // 0 ninguna, 1 sostenida, 2 pico
 unsigned int ms_sobre_3A[3];
 unsigned int ms_sobre_45A[3];
 int eje_evento = -1;
+char parado = 0;                    // 1 = "parar" desde el SCADA: EN apagados hasta "prender"
+const char *respuesta = 0;          // respuesta a scara/cmd pendiente; sale en el siguiente envio
 
 const char *nombre_eje[3]  = { "R1", "R2", "P" };
 const char *nombre_falla[3] = { "ninguna", "sostenida", "pico" };
@@ -125,6 +128,39 @@ static int amperios_a_texto(char *dst, float a) {
 }
 
 
+// Prender o apagar los 3 EN
+static void poner_en(GPIO_PinState v) {
+	for (int k = 0; k < 3; k++) {
+		HAL_GPIO_WritePin(en_puerto[k], en_pin[k], v);
+	}
+}
+
+
+// Comandos de scara/cmd (texto sin comillas). El STM32 solo atiende "parar" y "prender";
+// "mover,x,y,p", "bomba,..." y "servo,..." los atiende el nodo mqtt_cmd del PC.
+void scara_comandos(void) {
+	if (!isNewMQTTReceive()) return;
+	clearisNewMQTTReceive();
+	char *cmd = mqtt_payload();
+
+	if (strcmp(cmd, "parar") == 0) {
+		poner_en(GPIO_PIN_RESET);
+		parado = 1;
+		respuesta = "stm32: parado, EN apagados";
+	} else if (strcmp(cmd, "prender") == 0) {
+		// Tambien borra las fallas enclavadas
+		for (int k = 0; k < 3; k++) {
+			falla[k] = 0;
+			ms_sobre_3A[k] = 0;
+			ms_sobre_45A[k] = 0;
+		}
+		parado = 0;
+		poner_en(GPIO_PIN_SET);
+		respuesta = "stm32: prendido, EN encendidos";
+	}
+}
+
+
 // Publicar cada 500 ms
 void scara_publicar(void) {
 	static unsigned int ultimo_envio = 0;
@@ -133,6 +169,13 @@ void scara_publicar(void) {
 
 	if (get_tick() - ultimo_envio < PERIODO_PUBLICAR_MS) return;
 	ultimo_envio = get_tick();
+
+	// Un solo publish por envio: el FC41 no acepta otro mientras transmite
+	if (respuesta != 0) {
+		publish("scara/respuesta", (char *)respuesta);
+		respuesta = 0;
+		return;
+	}
 
 	// Si hubo falla: mandar scara/evento
 	if (eje_evento >= 0) {
@@ -160,7 +203,7 @@ void scara_publicar(void) {
 		"{\"n\":\"R1\",\"est\":\"%c\",\"pos\":0,\"i\":%s,\"falla\":\"%s\"},"
 		"{\"n\":\"R2\",\"est\":\"%c\",\"pos\":0,\"i\":%s,\"falla\":\"%s\"},"
 		"{\"n\":\"P\",\"est\":\"%c\",\"pos\":0,\"i\":%s,\"falla\":\"%s\"}]}",
-		hay_falla ? "FALLA" : "LISTO",
+		parado ? "PARADO" : (hay_falla ? "FALLA" : "LISTO"),
 		falla[0] ? 'F' : 'R', amp[0], nombre_falla[(int)falla[0]],
 		falla[1] ? 'F' : 'R', amp[1], nombre_falla[(int)falla[1]],
 		falla[2] ? 'F' : 'R', amp[2], nombre_falla[(int)falla[2]]);

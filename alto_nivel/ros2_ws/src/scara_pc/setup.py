@@ -15,6 +15,7 @@ setup(
             'bridge = scara_pc.bridge:main',
             'teleop = scara_pc.teleop:main',
             'p2p = scara_pc.p2p:main',
+            'mqtt_cmd = scara_pc.mqtt_cmd:main',
         ],
     },
 )

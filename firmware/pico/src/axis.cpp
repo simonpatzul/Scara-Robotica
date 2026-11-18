@@ -18,6 +18,7 @@ Axis::Axis(const AxisConfig& cfg)
       driver_(cfg.pwm_l, cfg.pwm_r, cfg.en_l, cfg.en_r, cfg.max_duty),
       limit_(cfg.limit_pin, cfg.limit_active_low),
       limit2_(cfg.limit_pin2, true),
+      fin_(cfg.fin_pin, true),
       rst_(*cfg.rst, cfg.max_duty * cfg.supply_volts) {}   // el RST satura igual que el driver
 
 void Axis::init() {
@@ -25,12 +26,19 @@ void Axis::init() {
     encoder_.init();
     limit_.init();
     if (cfg_.limit_pin2 != NO_PIN) limit2_.init();
+    if (cfg_.fin_pin != NO_PIN) fin_.init();
 }
 
 void Axis::update() {
     // 1. Medir
-    motor_rad_    = cfg_.encoder_sign * encoder_.count() * TWO_PI_F / cfg_.counts_per_rev;
+    motor_rad_    = cfg_.encoder_sign * encoder_.count() * TWO_PI_F / cfg_.counts_per_rev + cfg_.home_pos * cfg_.gear_ratio;
     position_rad_ = motor_rad_ / cfg_.gear_ratio;
+
+    // El PWM se queda como se dejó: si lo último que se mandó empuja hacia un final que ya está apretado, se corta aquí,
+    // cada ciclo, aunque el estado actual no vuelva a escribir la salida
+    guarda_ticks_ = en_limite() ? guarda_ticks_ + 1 : 0;
+    fin_ticks_ = en_fin() ? fin_ticks_ + 1 : 0;
+    salida(duty_);
 
     // 2. Atender la orden de home que dejó el núcleo 0
     if (home_request_) {
@@ -45,7 +53,7 @@ void Axis::update() {
         ticks_ = 0;
         state_ = AxisState::Lifting;
         lift_request_ = false;
-        driver_.set(lift_volts_ / cfg_.supply_volts);
+        salida(lift_volts_ / cfg_.supply_volts);
     }
 
     // 3. Actuar según el estado
@@ -62,10 +70,13 @@ void Axis::update() {
         ref_rad_ += falta > paso ? paso : (falta < -paso ? -paso : falta);
         const bool tope = cfg_.limit_stop && limit_ticks_ >= LIMIT_TICKS && (ref_rad_ - position_rad_) * hacia >= 0.0f;
         if (tope) ref_rad_ = position_rad_;   // contra el final no se acumula objetivo: al pedir salir, sale desde aquí
+        // Final del otro extremo: lo mismo en el sentido contrario
+        const bool tope_fin = fin_ticks_ >= LIMIT_TICKS && (ref_rad_ - position_rad_) * hacia <= 0.0f;
+        if (tope_fin) ref_rad_ = position_rad_;
         const float objetivo = ref_rad_;
         // El RST trabaja en el motor: la referencia de la articulación se multiplica por la relación
         float u = rst_.step(objetivo * cfg_.gear_ratio, motor_rad_);   // voltios
-        if (tope && u * hacia > 0.0f) {
+        if ((tope && u * hacia > 0.0f) || (tope_fin && u * hacia < 0.0f)) {
             rst_.reset(motor_rad_);   // sin esto seguiría acumulando empuje contra el límite
             u = 0.0f;
         }
@@ -73,9 +84,19 @@ void Axis::update() {
             fail("el encoder no cuenta con el motor empujando");
             return;
         }
-        driver_.set(u / cfg_.supply_volts);
+        salida(u / cfg_.supply_volts);
         u_volts_ = u;
     }
+}
+
+// Única salida al motor: con el final apretado (LIMIT_TICKS lecturas seguidas) nunca empuja hacia él, esté en el
+// estado que esté (subida previa, home, RST). Alejarse sí se puede
+void Axis::salida(float duty) {
+    const float hacia = cfg_.home_volts > 0.0f ? 1.0f : -1.0f;
+    if (guarda_ticks_ >= LIMIT_TICKS && duty * hacia > 0.0f) duty = 0.0f;
+    if (fin_ticks_ >= LIMIT_TICKS && duty * hacia < 0.0f) duty = 0.0f;   // el otro extremo
+    duty_ = duty;
+    driver_.set(duty);
 }
 
 void Axis::set_target_rad(float rad) {
@@ -98,7 +119,7 @@ void Axis::lift_step() {
         lift_prev_ = position_rad_;
     }
     if (fin) {
-        driver_.set(0.0f);
+        salida(0.0f);
         state_ = AxisState::Disabled;
     }
 }
@@ -124,7 +145,7 @@ bool Axis::sin_avance() {
 }
 
 void Axis::fail(const char* reason) {
-    driver_.set(0.0f);
+    salida(0.0f);
     driver_.enable(false);
     fault_reason_ = reason;
     state_ = AxisState::Fault;
@@ -145,15 +166,15 @@ void Axis::begin_homing() {
         phase_ = HomingPhase::Search;
         pause_ticks_ = 0;
         quiet_ticks_ = 0;
-        driver_.set(cfg_.home_volts / cfg_.supply_volts);   // el signo de home_volts lleva hacia el límite
+        salida(cfg_.home_volts / cfg_.supply_volts);   // el signo de home_volts lleva hacia el límite
     }
 }
 
 void Axis::zero_here() {
-    driver_.set(0.0f);
+    salida(0.0f);
     encoder_.reset_at(first_press_raw_);   // el cero donde se pisó el límite, no 30 ms después con el eje andando
-    motor_rad_ = 0.0f;
-    position_rad_ = 0.0f;
+    motor_rad_ = cfg_.home_pos * cfg_.gear_ratio;
+    position_rad_ = cfg_.home_pos;
     pause_ticks_ = PAUSE_TICKS;
     phase_ = HomingPhase::GoTo;
 }
@@ -161,7 +182,7 @@ void Axis::zero_here() {
 // Límite presionado: con home lento, el primer toque solo avisa dónde está; el cero sale del segundo toque, lento
 void Axis::sobre_limite() {
     if (phase_ == HomingPhase::Search && cfg_.home_slow_volts > 0.0f) {
-        driver_.set(0.0f);
+        salida(0.0f);
         limit_ticks_ = 0;
         soltado_ = false;
         pause_ticks_ = PAUSE_TICKS;
@@ -183,7 +204,7 @@ void Axis::homing_step() {
 
     if (phase_ == HomingPhase::Search || phase_ == HomingPhase::Touch) {
         if (pause_ticks_ > 0) {                          // Touch: pausa y luego vuelve lento al límite
-            if (--pause_ticks_ == 0) { driver_.set(hacia * lento); reset_avance(); }
+            if (--pause_ticks_ == 0) { salida(hacia * lento); reset_avance(); }
             return;
         }
         // Solo cuenta si el límite sigue presionado LIMIT_TICKS ciclos seguidos; un pico de ruido no detiene la búsqueda
@@ -205,7 +226,7 @@ void Axis::homing_step() {
 
     if (phase_ == HomingPhase::BackOff) {
         if (pause_ticks_ > 0) {
-            if (--pause_ticks_ == 0) { driver_.set(-hacia * lento); reset_avance(); }
+            if (--pause_ticks_ == 0) { salida(-hacia * lento); reset_avance(); }
             return;
         }
         if (encoder_muerto(cfg_.home_slow_volts, 0.0f)) { fail("el encoder no cuenta alejandose del limite"); return; }
@@ -214,7 +235,7 @@ void Axis::homing_step() {
             limit_ticks_ = en_limite() ? 0 : limit_ticks_ + 1;   // LIMIT_TICKS lecturas seguidas suelto
             if (limit_ticks_ >= LIMIT_TICKS) { soltado_ = true; soltado_en_ = position_rad_; }
         } else if ((soltado_en_ - position_rad_) * hacia >= BACKOFF_RAD) {
-            driver_.set(0.0f);
+            salida(0.0f);
             limit_ticks_ = 0;
             pause_ticks_ = PAUSE_TICKS;
             phase_ = HomingPhase::Touch;
@@ -225,14 +246,14 @@ void Axis::homing_step() {
     // GoTo: primero la pausa, luego se mueve hacia el objetivo (frenando al final si hay home lento) y se detiene al alcanzarlo
     if (pause_ticks_ > 0) {
         if (--pause_ticks_ == 0) {
-            dir_ = cfg_.home_target_rad > position_rad_ ? 1.0f : -1.0f;
+            dir_ = cfg_.home_pos + cfg_.home_target_rad > position_rad_ ? 1.0f : -1.0f;
             reset_avance();
         }
         return;
     }
     home_u_ = std::fabs(cfg_.home_volts);
     if (cfg_.home_slow_volts > 0.0f) {
-        const float falta = std::fabs(cfg_.home_target_rad - position_rad_);
+        const float falta = std::fabs(cfg_.home_pos + cfg_.home_target_rad - position_rad_);
         const float k = falta < FRENO_RAD ? falta / FRENO_RAD : 1.0f;
         home_u_ = cfg_.home_slow_volts + (home_u_ - cfg_.home_slow_volts) * k;
         if (sin_avance()) { fail("no avanza hacia el objetivo (voltaje lento muy bajo)"); return; }
@@ -241,15 +262,15 @@ void Axis::homing_step() {
         fail("el encoder no cuenta (se movio sin lecturas)");
         return;
     }
-    driver_.set(dir_ * home_u_ / cfg_.supply_volts);
-    if ((cfg_.home_target_rad - position_rad_) * dir_ <= 0.0f) {   // ya llegó o se pasó
-        driver_.set(0.0f);
-        encoder_.reset();                // este punto pasa a ser el cero definitivo
-        motor_rad_ = 0.0f;
-        position_rad_ = 0.0f;
-        target_rad_ = 0.0f;              // se queda en el cero hasta que llegue una orden
-        ref_rad_ = 0.0f;
-        rst_.reset(0.0f);                // el controlador arranca en reposo en el cero
+    salida(dir_ * home_u_ / cfg_.supply_volts);
+    if ((cfg_.home_pos + cfg_.home_target_rad - position_rad_) * dir_ <= 0.0f) {   // ya llegó o se pasó
+        salida(0.0f);
+        encoder_.reset();                // este punto pasa a valer home_pos (0 en R1 y R2): el cero definitivo
+        motor_rad_ = cfg_.home_pos * cfg_.gear_ratio;
+        position_rad_ = cfg_.home_pos;
+        target_rad_ = cfg_.home_pos;     // se queda aquí hasta que llegue una orden
+        ref_rad_ = cfg_.home_pos;
+        rst_.reset(motor_rad_);          // el controlador arranca en reposo
         state_ = AxisState::Ready;       // desde el próximo ciclo manda el RST
     }
 }
