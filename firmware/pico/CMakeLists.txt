@@ -14,6 +14,7 @@ add_executable(scara_fw
     src/motor_driver.cpp
     src/limit_switch.cpp
     src/rst_controller.cpp
+    src/enlace_stm32.cpp
 )
 pico_generate_pio_header(scara_fw ${CMAKE_CURRENT_LIST_DIR}/src/quadrature_encoder.pio)
 target_include_directories(scara_fw PRIVATE config)

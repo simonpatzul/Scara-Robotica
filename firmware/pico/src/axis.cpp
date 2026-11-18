@@ -56,10 +56,27 @@ void Axis::update() {
         salida(lift_volts_ / cfg_.supply_volts);
     }
 
+    // Con el EN apagado el motor no mueve: el home fallaría como "encoder no cuenta", mejor decirlo claro
+    if (!en_ && state_ == AxisState::Homing) {
+        fail("EN apagado por el STM32");
+        return;
+    }
+
     // 3. Actuar según el estado
     if (state_ == AxisState::Lifting) lift_step();
     else if (state_ == AxisState::Homing) homing_step();
     else if (state_ == AxisState::Ready) {
+        if (!en_) {
+            // EN apagado: sin salida, sin integrar, sin vigilar el encoder; el objetivo se queda donde está el eje
+            ref_rad_ = position_rad_;
+            target_rad_ = position_rad_;
+            rst_.reset(motor_rad_);
+            last_count_ = encoder_.count();
+            quiet_ticks_ = 0;
+            salida(0.0f);
+            u_volts_ = 0.0f;
+            return;
+        }
         // Tope: con el final de carrera presionado no se empuja hacia él, pero sí se puede salir en sentido contrario
         limit_ticks_ = en_limite() ? limit_ticks_ + 1 : 0;
         const float hacia = cfg_.home_volts > 0.0f ? 1.0f : -1.0f;   // el signo de home_volts lleva hacia el límite

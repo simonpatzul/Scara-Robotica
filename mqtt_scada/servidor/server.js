@@ -1,7 +1,6 @@
-// Librerias: PostgreSQL, MQTT y Express (los botones de Grafana mandan los comandos por HTTP)
+// Librerias: PostgreSQL y MQTT
 const { Pool } = require('pg');
 const mqtt = require('mqtt');
-const express = require('express');
 
 // Conexion a PostgreSQL 18
 const dbConfig = {
@@ -17,34 +16,38 @@ const pool = new Pool(dbConfig);
 const mqttClient = mqtt.connect('mqtt://localhost:1883');
 const TOPIC_ESTADO = 'scara/estado';
 const TOPIC_EVENTO = 'scara/evento';
-const TOPIC_CMD = 'scara/cmd';             // lo leen el STM32 (parar/prender) y el nodo mqtt_cmd del PC (el resto)
-const TOPIC_RESPUESTA = 'scara/respuesta'; // texto: lo que hizo el STM32 o el PC con cada comando
-const TOPIC_POS = 'scara/pos';             // JSON del nodo mqtt_cmd: r1, r2, p, x, y
+const TOPIC_CMD    = 'scara/cmd';
 
-// Al conectar: suscribirse a los topicos
+// Comandos de Grafana: los botones insertan en la tabla comandos y el trigger avisa por NOTIFY.
+// Solo se mandan comandos de los ultimos 10 s (uno viejo, p. ej. "on" de ayer, no debe prender nada).
+async function enviarComandos() {
+    const { rows } = await pool.query(
+        "UPDATE comandos SET enviado = true WHERE NOT enviado AND ts > now() - interval '10 seconds' " +
+        'RETURNING id, cmd');
+    for (const c of rows.sort((a, b) => a.id - b.id)) {
+        mqttClient.publish(TOPIC_CMD, c.cmd);
+        console.log(`COMANDO -> ${TOPIC_CMD}: ${c.cmd}`);
+    }
+}
+
+async function escucharComandos() {
+    const cliente = await pool.connect();
+    await cliente.query('LISTEN scara_cmd');
+    cliente.on('notification', () => enviarComandos().catch(e => console.error('Error enviando comando:', e.message)));
+    console.log('Escuchando comandos de Grafana (tabla comandos)');
+}
+escucharComandos().catch(e => console.error('No se pudo escuchar comandos (¿corriste schema.sql?):', e.message));
+
+// Al conectar: suscribirse a los 2 topicos
 mqttClient.on('connect', () => {
-    console.log('Conectado a Mosquitto. Suscrito a scara/estado, evento, respuesta y pos');
-    mqttClient.subscribe([TOPIC_ESTADO, TOPIC_EVENTO, TOPIC_RESPUESTA, TOPIC_POS]);
+    console.log('Conectado a Mosquitto. Suscrito a scara/estado y scara/evento');
+    mqttClient.subscribe([TOPIC_ESTADO, TOPIC_EVENTO]);
 });
 
 // Al llegar un mensaje: leer el JSON y guardarlo
 mqttClient.on('message', async (topic, message) => {
     try {
-        // Respuesta: es texto, no JSON
-        if (topic === TOPIC_RESPUESTA) {
-            await pool.query('INSERT INTO comandos (origen, texto) VALUES ($1, $2)', ['respuesta', message.toString()]);
-            console.log(`RESPUESTA: ${message.toString()}`);
-            return;
-        }
-
         const d = JSON.parse(message.toString());
-
-        // Posicion del robot: una fila en posicion
-        if (topic === TOPIC_POS) {
-            await pool.query('INSERT INTO posicion (r1, r2, p, x, y, parado) VALUES ($1, $2, $3, $4, $5, $6)',
-                [d.r1, d.r2, d.p, d.x, d.y, d.parado]);
-            return;
-        }
 
         // Estado: una fila en telemetria ($1..$16 en orden)
         if (topic === TOPIC_ESTADO) {
@@ -78,58 +81,11 @@ mqttClient.on('message', async (topic, message) => {
     }
 });
 
-// Comandos desde Grafana: los botones son formularios HTML (panel Text) que hacen POST a /cmd.
-// Solo pasan los comandos de esta lista; cualquier otra cosa se rechaza sin publicar nada.
-const PUERTO_HTTP = 3001;
-const NUM = '-?\\d+(\\.\\d+)?';
-const COMANDO_VALIDO = new RegExp(`^(parar|prender|bomba,[01]|servo,\\d{1,3}|mover,${NUM},${NUM},${NUM})$`);
-
-const app = express();
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
-app.use((req, res, next) => {   // Grafana corre en otro puerto: permitir la peticion
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    next();
-});
-
-// Pagina chica que se ve dentro del panel de Grafana despues de apretar un boton
-function pagina(texto, ok) {
-    return `<body style="margin:0;font:14px sans-serif;color:${ok ? '#73bf69' : '#f2495c'}">${texto}</body>`;
-}
-
-app.post('/cmd', async (req, res) => {
-    let cmd = String(req.body.cmd || '').trim().toLowerCase();
-    if (cmd === 'mover') cmd = `mover,${req.body.x},${req.body.y},${req.body.p}`;
-    if (cmd === 'servo') cmd = `servo,${req.body.g}`;
-    cmd = cmd.replace(/\s+/g, '');
-
-    if (!COMANDO_VALIDO.test(cmd)) {
-        console.log(`Comando rechazado: ${cmd}`);
-        return res.status(400).send(pagina(`Rechazado: "${cmd.replace(/[<>&"]/g, '')}" no es un comando valido`, false));
-    }
-    if (!mqttClient.connected) {
-        return res.status(503).send(pagina('Sin conexion con Mosquitto', false));
-    }
-
-    mqttClient.publish(TOPIC_CMD, cmd, { qos: 1 });
-    console.log(`COMANDO: ${cmd}`);
-    try {
-        await pool.query('INSERT INTO comandos (origen, texto) VALUES ($1, $2)', ['grafana', cmd]);
-    } catch (error) {
-        console.error('Error guardando el comando:', error.message);
-    }
-    res.send(pagina(`Enviado: ${cmd}`, true));
-});
-
-const servidorHttp = app.listen(PUERTO_HTTP, () => console.log(`Comandos en http://localhost:${PUERTO_HTTP}/cmd`));
-
 // CTRL+C: cerrar MQTT y la base
 console.log('Backend SCARA corriendo. Presiona CTRL+C para detenerlo.');
 
 process.on('SIGINT', async () => {
     console.log('\n[CTRL+C]');
-    servidorHttp.close();
     mqttClient.end();
     await pool.end();
     console.log('Adiós!');

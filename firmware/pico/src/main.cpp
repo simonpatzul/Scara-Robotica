@@ -5,6 +5,7 @@
 #include "pico/multicore.h"
 #include "hardware/pwm.h"
 #include "axis.h"
+#include "enlace_stm32.h"
 
 // ---------- Bomba (GP9, salida digital) y servo (GP8, PWM 50 Hz) ----------
 // Órdenes aparte de "r1,r2,p":  "B1" / "B0" = prender / apagar bomba,  "S<grados>" (0..180) = servo.
@@ -90,6 +91,69 @@ char state_char(AxisState s) {
     }
 }
 
+// ---------- Enlace con el STM32 (I2C, enlace_stm32.h) ----------
+// El STM32 dice qué EN están prendidos y pasa los comandos que llegan por MQTT (FC41); la Pico le cuenta su estado.
+char sistema = 'W';                  // W espera home, H home, R listo, F falla
+bool pc_conectado = false;           // el PC manda objetivos (el watchdog no está activo)
+bool secuencia_corriendo = false;    // lo avisa el bridge con "Q1" / "Q0"
+ComandoStm32 cmd_stm32;
+uint8_t ultimo_numero = 0;
+bool primer_cmd = true;              // el primer comando que se lee es viejo (de antes de arrancar): no se ejecuta
+absolute_time_t prox_enlace = nil_time;
+
+// Estado de un eje para el PC y el STM32: como state_char, pero 'A' si está listo con el EN apagado
+char estado_eje(const Axis& a) {
+    const AxisState s = a.state();
+    if (s == AxisState::Ready && !a.en()) return 'A';
+    return state_char(s);
+}
+
+uint8_t falla_eje(const Axis& a) {
+    if (a.state() != AxisState::Fault) return 0;
+    return strstr(a.fault_reason(), "encoder") ? 1 : 2;
+}
+
+// Cada ENLACE_PERIODO_MS: manda el estado y aplica los EN. Devuelve true si llegó un comando nuevo (queda en cmd_stm32).
+// Sin STM32 (no contesta) los EN se quedan como estaban: al arrancar, prendidos
+bool enlace_servicio() {
+    if (!time_reached(prox_enlace)) return false;
+    prox_enlace = make_timeout_time_ms(ENLACE_PERIODO_MS);
+    char est[3];
+    float pos[3];
+    uint8_t falla[3];
+    for (int k = 0; k < 3; ++k) {
+        est[k] = estado_eje(axes[k]);
+        pos[k] = axes[k].position_rad();
+        falla[k] = falla_eje(axes[k]);
+    }
+    const uint8_t flags = (pc_conectado ? 1 : 0) | (secuencia_corriendo ? 2 : 0) | (gpio_get(PIN_BOMBA) ? 4 : 0);
+    uint8_t trama[ENLACE_BYTES];
+    enlace_estado(trama, sistema, est, pos, flags, falla);
+    ComandoStm32 c;
+    if (!enlace_intercambio(trama, c)) return false;
+    for (int k = 0; k < 3; ++k) axes[k].set_en((c.en >> k) & 1);
+    const bool nuevo = !primer_cmd && c.numero != ultimo_numero && c.tipo != 0;
+    primer_cmd = false;
+    ultimo_numero = c.numero;
+    cmd_stm32 = c;
+    return nuevo;
+}
+
+// Espera 'ms' sin dejar de atender el enlace
+void esperar_ms(uint32_t ms) {
+    const absolute_time_t fin = make_timeout_time_ms(ms);
+    while (!time_reached(fin)) {
+        enlace_servicio();
+        sleep_ms(5);
+    }
+}
+
+// Un home falló: quedarse quieto, pero seguir avisando al STM32 (sistema F)
+[[noreturn]] void detenido() {
+    sistema = 'F';
+    while (true) esperar_ms(1000);
+}
+
 // Home de un eje, imprimiendo el avance. Devuelve true si terminó en Ready.
 bool home(Axis& a) {
     a.start_homing();
@@ -97,7 +161,7 @@ bool home(Axis& a) {
         printf("%s %-6s %8.4f rad | limite=%d | ciclos=%lu\n", a.name(),
                a.homing_phase() == HomingPhase::Search ? "Search" : a.homing_phase() == HomingPhase::BackOff ? "BackOff" : a.homing_phase() == HomingPhase::Touch ? "Touch" : "GoTo",
                a.position_rad(), a.limit(), (unsigned long)loop_count);
-        sleep_ms(100);
+        esperar_ms(100);
     }
     if (a.state() != AxisState::Ready) {
         printf("%s: FALLA, %s\n", a.name(), a.fault_reason());
@@ -111,6 +175,7 @@ int main() {
     stdio_init_all();
     for (Axis& a : axes) a.init();      // hardware listo antes de arrancar el lazo
     bomba_servo_init();
+    enlace_init();
     multicore_launch_core1(core1_main);
 
     sleep_ms(3000);                     // tiempo para abrir el monitor serie
@@ -127,28 +192,34 @@ int main() {
             printf("Escribe HOME y Enter para iniciar. Mantén la mano cerca del E-stop.\n");
             aviso = make_timeout_time_ms(1000);
         }
+        enlace_servicio();   // los comandos del STM32 se ignoran hasta el LISTO; los EN sí se aplican
         sleep_ms(10);
     }
+    sistema = 'H';
 
     // P primero: su home sube hasta el final de arriba (GP20), así la ventosa no se arrastra por la caja o el piso
     printf("Home de P: sube hasta el final de arriba...\n");
-    if (!home(axes[2])) while (true) sleep_ms(1000);
+    if (!home(axes[2])) detenido();
 
     if (solo_codo) {
         home(axes[0]);
         printf("Prueba del codo terminada: reinicia la Pico para el home completo\n");
-        while (true) sleep_ms(1000);
+        detenido();
     }
 
     // Luego hombro (R2) y codo (R1)
     Axis* orden[] = { &axes[1], &axes[0] };
     for (Axis* a : orden) {
-        if (!home(*a)) while (true) sleep_ms(1000);   // si un eje falla, no se sigue
+        if (!home(*a)) detenido();   // si un eje falla, no se sigue
     }
 
     // Control: el PC manda "r1,r2,p" (rad, rad, mm) y Enter, varias veces por segundo.
     // A cada línea se responde "pos_r1,pos_r2,pos_p,estados" (p. ej. "0.5012,-0.2000,35.120,RRR"), o "ERR".
+    // Estado 'A' = EN apagado por el STM32: ese eje ignora el objetivo y se queda donde está.
+    // Comandos del STM32 (MQTT): se le pasan al PC como "MV r1,r2,p", "SEQ" y "STOP". Sin PC, "MV" y "STOP" se hacen aquí.
+    // "Q1" / "Q0" del PC = la secuencia está corriendo / terminó (se le avisa al STM32).
     printf("LISTO\n");
+    sistema = 'R';
     char line[48];
     int n = 0;
     absolute_time_t last_cmd = get_absolute_time();
@@ -165,13 +236,18 @@ int main() {
                 const long g = strtol(line + 1, &end, 10);
                 if (end != line + 1 && *end == '\0') servo_grados(static_cast<int>(g));
                 else printf("ERR\n");
+            } else if (line[0] == 'Q' && (line[1] == '0' || line[1] == '1') && line[2] == '\0') {
+                secuencia_corriendo = line[1] == '1';
             } else if (parse_targets(line, t)) {
-                for (int i = 0; i < N_AXES; ++i) axes[i].set_target_rad(t[i]);
+                for (int i = 0; i < N_AXES; ++i) {
+                    if (axes[i].en()) axes[i].set_target_rad(t[i]);
+                }
                 last_cmd = get_absolute_time();
                 holding = false;
+                pc_conectado = true;
                 printf("%.4f,%.4f,%.3f,%c%c%c\n",
                        axes[0].position_rad(), axes[1].position_rad(), axes[2].position_rad(),
-                       state_char(axes[0].state()), state_char(axes[1].state()), state_char(axes[2].state()));
+                       estado_eje(axes[0]), estado_eje(axes[1]), estado_eje(axes[2]));
             } else {
                 printf("ERR\n");
             }
@@ -182,6 +258,30 @@ int main() {
             for (Axis& a : axes) a.set_target_rad(a.position_rad());
             gpio_put(PIN_BOMBA, 0);   // sin PC, la bomba también se apaga
             holding = true;
+            pc_conectado = false;
+            secuencia_corriendo = false;
+        }
+
+        bool falla = false;
+        for (Axis& a : axes) falla = falla || a.state() == AxisState::Fault;
+        sistema = falla ? 'F' : 'R';
+
+        if (enlace_servicio()) {
+            const ComandoStm32& c = cmd_stm32;
+            if (c.tipo == 'M') {
+                if (!holding) {
+                    printf("MV %.4f,%.4f,%.3f\n", c.valor[0], c.valor[1], c.valor[2]);
+                } else {
+                    for (int k = 0; k < 3; ++k) {
+                        if (axes[k].en()) axes[k].set_target_rad(c.valor[k]);
+                    }
+                }
+            } else if (c.tipo == 'Q') {
+                if (!holding) printf("SEQ\n");   // la secuencia corre en el PC: sin PC no hay secuencia
+            } else if (c.tipo == 'X') {
+                for (Axis& a : axes) a.set_target_rad(a.position_rad());
+                printf("STOP\n");
+            }
         }
     }
 }

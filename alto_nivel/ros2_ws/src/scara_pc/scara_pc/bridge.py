@@ -10,8 +10,18 @@
 # puerto (/dev/ttyACM*) y lleva el brazo a la posición segura, sin repetir el home.
 # Si la Pico se reinició perdió el home y sus posiciones no valen: no se le manda nada hasta que se
 # reinicie este nodo con Home. Solo la línea HOME arranca el home de la Pico.
+# Comandos de Grafana (MQTT -> FC41 -> STM32 -> I2C -> Pico), que la Pico pasa por el USB:
+#   "MV r1,r2,p"  ir a esas coordenadas (rad, rad, mm). Se ignora mientras corre la secuencia
+#   "SEQ"         correr la secuencia de la caja (alto_nivel/secuencias/secuencia_caja.py, parámetro 'secuencia')
+#   "STOP"        parar la secuencia: se queda donde está y apaga la bomba
+# Estado 'A' de un eje = el STM32 le apagó el EN: su objetivo se iguala a la posición, así al prenderlo no salta.
+# Cada 0.25 s se le dice a la Pico si la secuencia corre ("Q1" / "Q0"), para que el STM32 lo publique.
 import glob
 import math
+import os
+import signal
+import subprocess
+import sys
 import time
 import serial
 import rclpy
@@ -34,6 +44,9 @@ class Bridge(Node):
         super().__init__('bridge')
         port = self.declare_parameter('port', '/dev/ttyACM0').value
         rate = self.declare_parameter('rate_hz', 20.0).value
+        self.ruta_secuencia = self.declare_parameter(
+            'secuencia', os.path.expanduser('~/scara_ws/SCARA_Robotica/alto_nivel/secuencias/secuencia_caja.py')).value
+        self.secuencia = None              # proceso de la secuencia, si se lanzó desde Grafana
 
         self.ser = serial.Serial(port, 115200, timeout=1.0)
         self.home()
@@ -91,6 +104,42 @@ class Bridge(Node):
             return
         grados = int(round(min(msg.data, 180.0)))
         self.send(f'S{grados}\n'.encode())
+
+    def corre_secuencia(self):
+        return self.secuencia is not None and self.secuencia.poll() is None
+
+    def mover(self, texto):
+        """MV de Grafana: el objetivo pasa a esas coordenadas (la Pico las recorta a los límites de cada eje)."""
+        try:
+            v = [float(x) for x in texto.split(',')]
+        except ValueError:
+            v = []
+        if len(v) != 3 or not all(math.isfinite(x) for x in v):
+            self.get_logger().warning(f'MV no válido: {texto}')
+        elif self.corre_secuencia() or self.a_segura or self.ruta:
+            self.get_logger().warning(f'MV {texto} ignorado: está corriendo la secuencia o yendo a la posición segura')
+        else:
+            self.get_logger().info(f'MV desde Grafana: {texto}')
+            self.target = v
+
+    def iniciar_secuencia(self):
+        if self.corre_secuencia():
+            self.get_logger().info('SEQ: la secuencia ya está corriendo')
+            return
+        if self.a_segura or self.ruta:
+            self.get_logger().warning('SEQ ignorado: el brazo va a la posición segura')
+            return
+        self.get_logger().info(f'SEQ desde Grafana: {self.ruta_secuencia}')
+        self.secuencia = subprocess.Popen([sys.executable, self.ruta_secuencia])
+
+    def parar_secuencia(self):
+        if self.corre_secuencia():
+            self.secuencia.send_signal(signal.SIGINT)
+            self.get_logger().warning('STOP desde Grafana: secuencia detenida')
+        self.bomba = False
+        self.send(b'B0\n')
+        if self.medido:
+            self.target = list(self.medido)
 
     def send(self, data):
         if self.ser is None or self.t_reconexion is not None or self.sin_home:
@@ -181,6 +230,7 @@ class Bridge(Node):
         self.n_tick += 1
         if self.n_tick % 5 == 0:
             self.send(b'B1\n' if self.bomba else b'B0\n')
+            self.send(b'Q1\n' if self.corre_secuencia() else b'Q0\n')
 
         # Leer todas las respuestas que hayan llegado y quedarse con la última válida
         last = None
@@ -196,6 +246,12 @@ class Bridge(Node):
                         self.bomba_pico = line
                 elif line.startswith(AVISO_HOME):   # la Pico sí se reinició: perdió el home
                     self.reinicio()
+                elif line.startswith('MV '):
+                    self.mover(line[3:])
+                elif line == 'SEQ':
+                    self.iniciar_secuencia()
+                elif line == 'STOP':
+                    self.parar_secuencia()
         except (serial.SerialException, OSError) as e:
             self.desconectado(e)
         if last is None:
@@ -205,6 +261,9 @@ class Bridge(Node):
             return
         self.ult_resp = time.monotonic()
         self.medido = [float(v) for v in last[:3]]
+        for k, e in enumerate(last[3][:3]):
+            if e == 'A':   # EN apagado por el STM32: el objetivo sigue al eje, así al prenderlo no salta
+                self.target[k] = self.medido[k]
 
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()

@@ -23,18 +23,24 @@ CREATE TABLE IF NOT EXISTS eventos (
   corriente  REAL
 );
 
--- Comandos: lo que se mando desde Grafana (origen = grafana) y lo que contesto el robot (origen = respuesta)
+-- Comandos: los botones de Grafana insertan aqui; server.js los manda a scara/cmd
+--   on, off, on1..on3, off1..off3, reset   -> STM32 (EN de los drivers)
+--   mv r1,r2,p                             -> coordenadas objetivo (rad, rad, mm): STM32 -> Pico (I2C) -> bridge
+--   seq / stop                             -> correr / parar la secuencia de la caja (la corre el PC de la Pico)
 CREATE TABLE IF NOT EXISTS comandos (
-  id      SERIAL PRIMARY KEY,
-  ts      TIMESTAMPTZ DEFAULT now(),
-  origen  VARCHAR(12),
-  texto   VARCHAR(200)
+  id       SERIAL PRIMARY KEY,
+  ts       TIMESTAMPTZ DEFAULT now(),
+  cmd      VARCHAR(40) NOT NULL,
+  enviado  BOOLEAN DEFAULT false
 );
 
--- Posicion: una fila por cada scara/pos (cada 500 ms, la manda el nodo mqtt_cmd del PC)
-CREATE TABLE IF NOT EXISTS posicion (
-  id      SERIAL PRIMARY KEY,
-  ts      TIMESTAMPTZ DEFAULT now(),
-  r1 REAL, r2 REAL, p REAL, x REAL, y REAL,
-  parado  BOOLEAN
-);
+-- Aviso inmediato a server.js (LISTEN scara_cmd) en cada comando nuevo
+CREATE OR REPLACE FUNCTION avisar_comando() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('scara_cmd', NEW.id::text);
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS comandos_aviso ON comandos;
+CREATE TRIGGER comandos_aviso AFTER INSERT ON comandos
+  FOR EACH ROW EXECUTE FUNCTION avisar_comando();

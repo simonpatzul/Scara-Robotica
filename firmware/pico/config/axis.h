@@ -24,6 +24,10 @@ public:
     // sirve para subir P antes del home y no arrastrar la ventosa por la caja o el piso
     void start_lift(float volts, float dist, uint32_t ms) { lift_volts_ = volts; lift_dist_ = dist; lift_ms_ = ms; lift_request_ = true; }
     void set_target_rad(float rad);   // ángulo objetivo de la articulación, recortado al rango permitido
+    // EN del driver, que lo maneja el STM32 (llega por I2C). Apagado: el eje no empuja ni acumula error,
+    // y su objetivo sigue a la posición, así al volver a prender no salta
+    void set_en(bool on) { en_ = on; }
+    bool en() const { return en_; }
 
     // Lecturas (seguras desde cualquier núcleo)
     AxisState state() const { return home_request_ ? AxisState::Homing : lift_request_ ? AxisState::Lifting : state_; }
@@ -91,6 +95,7 @@ private:
     // Lo escribe el núcleo 0 (pide) y lo borra el núcleo 1 (atiende)
     volatile bool home_request_ = false;
     volatile bool lift_request_ = false;
+    volatile bool en_ = true;     // lo escribe el núcleo 0 (EN que reporta el STM32)
     volatile float lift_moved_ = 0.0f;
     const char* volatile fault_reason_ = "";
 };

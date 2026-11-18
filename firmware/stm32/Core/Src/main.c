@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "enlace/enlace.h"
 // Libreria FC41 de clase + modulo del SCARA
 #include "FC41/FC41.h"
 #include "UART/uart.h"
@@ -110,6 +111,7 @@ int main(void)
   init_FC();
   enable_uart1_rx();
   start_timer();
+  enlace_init();      // I2C1 esclavo con la Pico (PB6/PB7)
   scara_init();
 
   /* USER CODE END 2 */

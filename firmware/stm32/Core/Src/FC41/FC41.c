@@ -263,10 +263,6 @@ void clearisNewMQTTReceive(void) {
 	states.mqtt.new_data=0;
 }
 
-char *mqtt_payload(void) {
-	return states.mqtt.payload;
-}
-
 void FC41_state_machine(void) {
 	if (get_tick()!=fc41_tick) {
 		fc41_tick = get_tick();
@@ -904,12 +900,7 @@ void getData(void) {
 	p=next_coma(p);
 	p=copyintto(&states.mqtt.payloadSize,p);
 	p++;
-	// (SCARA) payload hasta la comilla, con tope y terminado en 0 para poder compararlo con strcmp
-	int n = 0;
-	while (*p != '\"' && *p != 0 && n < (int)sizeof(states.mqtt.payload) - 1) {
-		states.mqtt.payload[n++] = *p++;
-	}
-	states.mqtt.payload[n] = 0;
+	p=copyto(states.mqtt.payload,p);
 }
 
 char * next_coma(char *p) {
@@ -921,12 +912,13 @@ char * next_coma(char *p) {
 }
 
 char * copyto(char *dest, char *p) {
-	while(*p!='\"') {
+	while(*p!='\"' && *p!=0) {
 		*dest=*p;
 		dest++;
 		p++;
 	}
-	p++;
+	*dest=0;   // (SCARA) terminar el texto para poder compararlo
+	if (*p) p++;
 	return p;
 }
 
