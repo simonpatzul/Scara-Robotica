@@ -174,7 +174,7 @@ int fc41_timelimit=100;
 #define DEFAULT_SSID	"Simon\0"          // nombre del Wi-Fi (sin espacios)
 #define DEFAULT_PASS	"12345678\0"         // clave del Wi-Fi (si no tiene: "\"\"\0")
 
-#define DEFAULT_IP		"172.19.133.20\0"  // IP del PC con Mosquitto: es solo la primera que se prueba; si no contesta,
+#define DEFAULT_IP		"10.217.162.20\0"  // IP del PC con Mosquitto: es solo la primera que se prueba; si no contesta,
                                            // se busca en la red (broker.c) y la que funcione se guarda en la flash
 #define DEFAULT_PORT	"1883\0"
 #define DEFAULT_USERMQTT 	"scara_stm32\0"   // client id MQTT (max 15 letras)
@@ -528,6 +528,7 @@ void FC41_state_machine(void) {
 		//insert_sp_buffer(states.modem.tx_command,strlen((char *)states.modem.tx_command));
 		HAL_UART_Transmit_IT(&huart1, (unsigned char *)states.modem.tx_command, strlen((char *)states.modem.tx_command));
 		fc41_timelimit=10000;
+		fc41_timeout=1;                         //(SCARA) sin esto, si no llega OK se quedaba esperando para siempre
 		fc41_next_state = FC_OPENrx;
 		break;
 
@@ -538,7 +539,8 @@ void FC41_state_machine(void) {
 			fc41_timelimit=ESPERA_BROKER_MS;
 			fc41_event=0;
 		}
-		if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout) {
+		//(SCARA) "+QMTOPEN: 1,<error>" puede llegar sin el OK (p. ej. IP invalida): probar la siguiente
+		if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout || fc41_event == EV_FC41_sessionError) {
 			otra_ip();
 		}
 		break;
