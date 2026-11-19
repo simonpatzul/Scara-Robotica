@@ -21,12 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "enlace/enlace.h"
-// Libreria FC41 de clase + modulo del SCARA
-#include "FC41/FC41.h"
-#include "UART/uart.h"
-#include "timer/timer.h"
-#include "scara/scara.h"
+void scara_simple(void);   // todo el programa esta en scara_simple.c
 
 /* USER CODE END Includes */
 
@@ -107,12 +102,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  // Arranque: WiFi, UART, timer 1 ms y medicion
-  init_FC();
-  enable_uart1_rx();
-  start_timer();
-  enlace_init();      // I2C1 esclavo con la Pico (PB6/PB7)
-  scara_init();
+  scara_simple();     // mide corriente, MQTT y boton PARAR (no regresa)
 
   /* USER CODE END 2 */
 
@@ -123,16 +113,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // Modem FC41 (de clase)
-    FC41_state_machine();
-    FC41_state_response();
-
-    // Proteccion y envio MQTT
-    scara_proteccion();
-    if (isWifiReady() != 0) {
-      scara_comandos();
-      scara_publicar();
-    }
   }
   /* USER CODE END 3 */
 }

@@ -6,12 +6,11 @@ SCARA RRP v2 (PCB con Pico RP2040 + STM32 + drivers IFX007T): firmware, ROS 2 Ja
 | Carpeta | Qué hay |
 |---|---|
 | `firmware/pico/` | firmware de la Pico: `src/` y `config/` (scara_fw: RST, home, encoders) y `pruebas/` (programas de prueba) |
-| `firmware/stm32/` | firmware del STM32 (WiFi FC41, EN de los drivers) y `grabar_stm32.bat` |
-| `firmware/arduino/` | versiones Arduino de referencia (`scara_rst`, `scara_prueba_pines`) |
+| `firmware/stm32/` | firmware del STM32: todo en `Core/Src/scara_simple.c` (corriente, MQTT, PARAR, alertas) |
 | `bajo_nivel/` | PC ↔ robot: `home.sh`, `subir_controlador.sh`, `pruebas/` (ejes, servo, bomba, finales) y `control_rst/` (diseño del RST) |
 | `alto_nivel/` | `ros2_ws/` (bridge, ik, p2p, teleop, URDF), `secuencias/` (caja → bandeja) y `gemelo/` (RViz) |
-| `mqtt_scada/` | `puente/` (ROS 2 → MQTT), `web_local/` (página SCADA local) y `servidor/` (backend Node + simulador) |
-| `docs/` | notas de cambios y problemas |
+| `mqtt_scada/` | `servidor/` (server.js: MQTT ↔ PostgreSQL) y `grafana/` (dashboard: corriente, PARAR, alertas) |
+| `docs/` | `sistema_simple.md`: cómo funciona el monitoreo de corriente, la parada y las alertas |
 
 ## Compilar
 Firmware (necesita Pico SDK y el compilador ARM):
@@ -38,7 +37,7 @@ ros2 run scara_pc p2p      # escribir: x y p (mm)
 ros2 run scara_pc teleop   # Q/A codo, W/S hombro, E/D prismático
 alto_nivel/secuencias/secuencia.sh   # caja -> bandeja
 ```
-Página SCADA local: `python3 mqtt_scada/web_local/scada_web.py` y abrir http://localhost:8765
+Corriente, PARAR y alertas: Grafana en http://localhost:3000 (ver `docs/sistema_simple.md`).
 
 ## Pines (PCB v2)
 | Eje | IN (A,B) | Encoder (A,B) | Final de carrera |

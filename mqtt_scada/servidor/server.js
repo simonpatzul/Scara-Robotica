@@ -49,26 +49,15 @@ mqttClient.on('message', async (topic, message) => {
     try {
         const d = JSON.parse(message.toString());
 
-        // Estado: una fila en telemetria ($1..$16 en orden)
+        // Estado: {"on":1,"i1":0.12,"i2":0.08,"i3":0.11} -> una fila en telemetria
         if (topic === TOPIC_ESTADO) {
-            const [r1, r2, p] = d.ejes;
-
-            const query = 'INSERT INTO telemetria (ciclo, pico_ok, temp_pico, temp_stm32, ' +
-                'r1_pos, r1_i, r1_est, r1_falla, ' +
-                'r2_pos, r2_i, r2_est, r2_falla, ' +
-                'p_pos,  p_i,  p_est,  p_falla) ' +
-                'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)';
-
-            await pool.query(query, [
-                d.ciclo, d.pico_ok, d.temp.pico, d.temp.stm32,
-                r1.pos, r1.i, r1.est, r1.falla,
-                r2.pos, r2.i, r2.est, r2.falla,
-                p.pos,  p.i,  p.est,  p.falla
-            ]);
-            console.log(`Estado guardado. ciclo=${d.ciclo}  i=${r1.i} ${r2.i} ${p.i} A`);
+            const ciclo = d.on ? 'ENCENDIDO' : 'APAGADO';
+            const query = 'INSERT INTO telemetria (ciclo, r1_i, r2_i, p_i) VALUES ($1, $2, $3, $4)';
+            await pool.query(query, [ciclo, d.i1, d.i2, d.i3]);
+            console.log(`Estado guardado. ${ciclo}  i=${d.i1} ${d.i2} ${d.i3} A`);
         }
 
-        // Falla: una fila en eventos
+        // Alerta: {"eje":"R1","falla":"alta","i":3.20} -> una fila en eventos
         if (topic === TOPIC_EVENTO) {
             const query = 'INSERT INTO eventos (eje, falla, corriente) VALUES ($1, $2, $3)';
             await pool.query(query, [d.eje, d.falla, d.i]);

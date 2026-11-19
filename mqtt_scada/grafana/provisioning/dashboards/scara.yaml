@@ -1,9 +1,0 @@
-# Carga los dashboards de la carpeta mqtt_scada/grafana/dashboards
-apiVersion: 1
-providers:
-  - name: SCARA
-    folder: SCARA
-    type: file
-    allowUiUpdates: true
-    options:
-      path: C:/RUTA/AL/REPO/mqtt_scada/grafana/dashboards   # cambiar por la ruta real del repo

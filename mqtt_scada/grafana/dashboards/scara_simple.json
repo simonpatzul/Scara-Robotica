@@ -1,0 +1,170 @@
+{
+  "title": "SCARA – Corriente, parada y alertas",
+  "uid": "scara-simple",
+  "description": "Panel simple: corriente de los 3 motores, boton PARAR (apaga los 3 EN) y alertas. Las coordenadas se manejan por ROS 2 en la Linux.",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "2s",
+  "schemaVersion": 41,
+  "tags": ["scara"],
+  "time": { "from": "now-5m", "to": "now" },
+  "timezone": "browser",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "speakyourcode-button-panel",
+      "title": "Parada",
+      "description": "PARAR manda 'off': apaga los EN de los 3 drivers. Ojo: si P no se sostiene solo, puede bajar sin el EN. 'Prender EN' manda 'on'.",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
+      "options": {
+        "orientation": "horizontal",
+        "buttons": [
+          {
+            "datasource": "grafana-postgresql-datasource",
+            "query": "{\"refId\":\"A\",\"datasource\":{\"type\":\"grafana-postgresql-datasource\",\"uid\":\"bg3gc3wzmcpvkd\"},\"format\":\"table\",\"rawQuery\":true,\"rawSql\":\"INSERT INTO comandos (cmd) VALUES ('off') RETURNING id, cmd\"}",
+            "text": "⏹ PARAR",
+            "variant": "destructive"
+          },
+          {
+            "datasource": "grafana-postgresql-datasource",
+            "query": "{\"refId\":\"A\",\"datasource\":{\"type\":\"grafana-postgresql-datasource\",\"uid\":\"bg3gc3wzmcpvkd\"},\"format\":\"table\",\"rawQuery\":true,\"rawSql\":\"INSERT INTO comandos (cmd) VALUES ('on') RETURNING id, cmd\"}",
+            "text": "Prender EN",
+            "variant": "primary"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Motores y datos",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ciclo AS \"Motores\", round(extract(epoch FROM now() - ts)::numeric, 1) AS \"Seg. sin datos\" FROM telemetria ORDER BY id DESC LIMIT 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 3 } ] },
+          "mappings": [
+            { "type": "value", "options": {
+              "ENCENDIDO": { "color": "green", "index": 0 },
+              "APAGADO": { "color": "red", "index": 1 } } }
+          ]
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Seg. sin datos" }, "properties": [ { "id": "unit", "value": "s" } ] }
+        ]
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "justifyMode": "center", "orientation": "horizontal" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Corriente ahora (A)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r1_i AS \"R1 (M1)\", r2_i AS \"R2 (M2)\", p_i AS \"P (M3)\" FROM telemetria ORDER BY id DESC LIMIT 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "amp",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 2.5 }, { "color": "red", "value": 3 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "justifyMode": "center", "orientation": "vertical" }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Corrientes de los motores (A)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 11 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT ts AS time, r1_i AS \"R1 (M1)\", r2_i AS \"R2 (M2)\", p_i AS \"P (M3)\" FROM telemetria WHERE $__timeFilter(ts) ORDER BY ts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "amp",
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": false, "thresholdsStyle": { "mode": "dashed" } },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 2.5 }, { "color": "red", "value": 3 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } }
+    },
+    {
+      "id": 5,
+      "type": "alertlist",
+      "title": "Alertas activas",
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 20 },
+      "options": {
+        "viewMode": "list",
+        "groupMode": "default",
+        "groupBy": [],
+        "maxItems": 20,
+        "sortOrder": 1,
+        "dashboardAlerts": false,
+        "alertName": "",
+        "alertInstanceLabelFilter": "",
+        "showInstances": true,
+        "folder": { "uid": "scara-alertas" },
+        "stateFilter": { "firing": true, "pending": true, "noData": true, "error": true, "normal": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Últimas alertas del STM32",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+      "gridPos": { "h": 8, "w": 14, "x": 10, "y": 20 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "bg3gc3wzmcpvkd" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ts AS \"Hora\", eje AS \"Eje\", falla AS \"Alerta\", corriente AS \"Corriente (A)\" FROM eventos WHERE eje <> 'EST' ORDER BY id DESC LIMIT 20"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "inspect": false } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Corriente (A)" }, "properties": [ { "id": "unit", "value": "amp" }, { "id": "decimals", "value": 2 } ] }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    }
+  ]
+}

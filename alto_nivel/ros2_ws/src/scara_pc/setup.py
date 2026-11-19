@@ -1,4 +1,4 @@
-from setuptools import setup
+﻿from setuptools import setup
 
 setup(
     name='scara_pc',
@@ -11,11 +11,10 @@ setup(
     install_requires=['setuptools'],
     entry_points={
         'console_scripts': [
-            # nombre_del_ejecutable = archivo:funcion   (cada nodo nuevo se agrega aquí)
+            # nombre_del_ejecutable = archivo:funcion   (cada nodo nuevo se agrega aquÃ­)
             'bridge = scara_pc.bridge:main',
             'teleop = scara_pc.teleop:main',
             'p2p = scara_pc.p2p:main',
-            'mqtt_cmd = scara_pc.mqtt_cmd:main',
         ],
     },
 )
