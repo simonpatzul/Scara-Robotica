@@ -7,6 +7,7 @@
 
 
 #include "FC41.h"
+#include "broker.h"
 #include "../UART/uart.h"
 #include "../timer/timer.h"
 #include "../STATES/states.h"
@@ -124,6 +125,7 @@ const unsigned char commands[15][60]={
 	"{\"%s\":%i,\"%s\":%i}\0",
 	"AT+QHTTPCFG=\"url\",\"%s\"\r\0",  //url post setup
 	"AT+QHTTPPOST=%i,120,120,\"data\",\"\",\"application/json\"\r\0", //post start
+	"AT+QMTCLOSE=1\r\0",   //(SCARA) soltar un QMTOPEN que no contesto, para probar otra IP
 };
 
 enum {
@@ -141,6 +143,7 @@ enum {
 	QJSON,
 	QPOST_setup,
 	QPOST_start,
+	QCLOSE,
 };
 
 
@@ -171,7 +174,8 @@ int fc41_timelimit=100;
 #define DEFAULT_SSID	"Simon\0"          // nombre del Wi-Fi (sin espacios)
 #define DEFAULT_PASS	"12345678\0"         // clave del Wi-Fi (si no tiene: "\"\"\0")
 
-#define DEFAULT_IP		"172.19.133.20\0"  // IP del PC donde corre Mosquitto
+#define DEFAULT_IP		"172.19.133.20\0"  // IP del PC con Mosquitto: es solo la primera que se prueba; si no contesta,
+                                           // se busca en la red (broker.c) y la que funcione se guarda en la flash
 #define DEFAULT_PORT	"1883\0"
 #define DEFAULT_USERMQTT 	"scara_stm32\0"   // client id MQTT (max 15 letras)
 #define DEFAULT_LOGINMQTT	"\0"
@@ -182,7 +186,8 @@ int fc41_timelimit=100;
 #define DEFAULT_URL		"https://httpbin.org/post"
 
 #define SKIP_WAIT1	1
-#define SKIP_GETIP	1
+#define SKIP_GETIP	0   // (SCARA) 0: se pide la IP propia y la puerta de enlace, para buscar el broker en la subred
+#define ESPERA_BROKER_MS	2500   // (SCARA) si Mosquitto no contesta en este tiempo, se prueba la siguiente IP
 
 void init_FC(void) {
 	strcpy(states.modem.SSID,(char *)DEFAULT_SSID);
@@ -261,6 +266,19 @@ char isNewMQTTReceive(void) {
 
 void clearisNewMQTTReceive(void) {
 	states.mqtt.new_data=0;
+}
+
+// (SCARA) La IP probada no tiene Mosquitto: soltar el QMTOPEN y pasar a la siguiente.
+// Si ya se probaron todas, esperar 10 s antes de dar otra vuelta
+static char broker_listo = 0;
+
+static void otra_ip(void) {
+	HAL_UART_Transmit_IT(&huart1, commands[QCLOSE], strlen((char *)commands[QCLOSE]));
+	char vuelta = broker_siguiente();
+	fc41_next_state = FC_OPEN_WAIT;
+	fc41_timeout=1;
+	fc41_timelimit = vuelta ? 500 : 10000;
+	fc41_event=0;
 }
 
 void FC41_state_machine(void) {
@@ -451,18 +469,16 @@ void FC41_state_machine(void) {
 		break;
 
 	case FC_getIPrx:
-		if (fc41_event == EV_FC41_gotip) {
+		// (SCARA) con o sin respuesta se sigue: sin IP propia solo se prueban la guardada y DEFAULT_IP
+		if (fc41_event == EV_FC41_gotip || fc41_event == EV_FC41_ok) {
 			fc41_next_state = FC_CONFIG;
 			fc41_event=0;
 			fc41_timeout=0;
 		}
-		if (fc41_event == EV_FC41_error) {
-			fc41_next_state = FC_wait_2;
-			fc41_timeout=0;
-			fc41_event=0;
-		}
-		if (fc41_event == EV_FC41_timeout) {
-			fc41_next_state = FC_wait_2;
+		if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout) {
+			if (!broker_listo) broker_inicio("", "", DEFAULT_IP);
+			broker_listo = 1;
+			fc41_next_state = FC_CONFIG;
 			fc41_timeout=0;
 			fc41_event=0;
 		}
@@ -506,6 +522,8 @@ void FC41_state_machine(void) {
 		break;
 
 	case FC_OPEN:
+		if (!broker_listo) { broker_inicio("", "", DEFAULT_IP); broker_listo = 1; }
+		strcpy(states.mqtt.IP_DNS, broker_actual());   //(SCARA) la IP que toca probar
 		sprintf(states.modem.tx_command,(char *)commands[QOPEN],states.mqtt.IP_DNS,states.mqtt.PORT);
 		//insert_sp_buffer(states.modem.tx_command,strlen((char *)states.modem.tx_command));
 		HAL_UART_Transmit_IT(&huart1, (unsigned char *)states.modem.tx_command, strlen((char *)states.modem.tx_command));
@@ -516,28 +534,24 @@ void FC41_state_machine(void) {
 	case FC_OPENrx:
 		if (fc41_event == EV_FC41_ok) {
 			fc41_next_state = FC_OPEN_state;
-			fc41_timeout=0;
+			fc41_timeout=1;                     //(SCARA) antes esperaba sin limite
+			fc41_timelimit=ESPERA_BROKER_MS;
 			fc41_event=0;
 		}
-		if (fc41_event == EV_FC41_error) {
-			fc41_next_state = FC_OPEN_WAIT;
-			fc41_timeout=1;
-			fc41_timelimit=10000;
-			fc41_event=0;
+		if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout) {
+			otra_ip();
 		}
 		break;
 
 	case FC_OPEN_state:
 		if (fc41_event == EV_FC41_session) {
+			broker_encontrado();                //(SCARA) esta IP sirve: guardarla
 			fc41_next_state = FC_CONN_BROKER;
 			fc41_timeout=0;
 			fc41_event=0;
 		}
-		if (fc41_event == EV_FC41_sessionError) {
-			fc41_next_state = FC_OPEN_WAIT;
-			fc41_timeout=1;
-			fc41_timelimit=10000;
-			fc41_event=0;
+		if (fc41_event == EV_FC41_sessionError || fc41_event == EV_FC41_timeout) {
+			otra_ip();
 		}
 		break;
 
@@ -823,11 +837,9 @@ void fc41_process(void) {
 	if (strncmp(states.modem.rx_response,"QGETIP:",7)==0) {
 		get_ip();
 	}
-	if (strncmp(states.modem.rx_response,"QMTOPEN: 1,0",12)==0) {
-		fc41_event=EV_FC41_session;
-	}
-	if (strncmp(states.modem.rx_response,"QMTOPEN: 1,-1",12)==0) {
-		fc41_event=EV_FC41_sessionError;
+	if (strncmp(states.modem.rx_response,"QMTOPEN: 1,",11)==0) {
+		//(SCARA) 0 = conecto; cualquier otro codigo (-1, 1..5) = esa IP no sirve
+		fc41_event = (states.modem.rx_response[11]=='0') ? EV_FC41_session : EV_FC41_sessionError;
 	}
 	if (strncmp(states.modem.rx_response,"QMTCONN: 1,0,0",14)==0) {
 		fc41_event=EV_FC41_broker;
@@ -864,7 +876,35 @@ void get_stat(void) {
 	}
 }
 
+// (SCARA) "QGETIP: <ip>,<mascara>,<puerta>,<dns>": no se sabe si trae comillas o el nombre de la interfaz,
+// asi que se toman las 3 primeras direcciones "a.b.c.d" que aparezcan en la linea
+static const char *siguiente_ip(const char *p, char *dst) {
+	dst[0] = 0;
+	while (*p) {
+		int n = 0, puntos = 0;
+		while (((p[n] >= '0' && p[n] <= '9') || p[n] == '.') && n < 15) {
+			if (p[n] == '.') puntos++;
+			n++;
+		}
+		if (puntos == 3 && n >= 7) {
+			memcpy(dst, p, n);
+			dst[n] = 0;
+			return p + n;
+		}
+		p += (n > 0) ? n : 1;
+	}
+	return p;
+}
+
 void get_ip(void) {
+	char ip[16], mascara[16], gw[16];
+	const char *r = siguiente_ip(states.modem.rx_response, ip);
+	r = siguiente_ip(r, mascara);
+	siguiente_ip(r, gw);
+	if (ip[0] != 0) {
+		broker_inicio(ip, gw, DEFAULT_IP);
+		broker_listo = 1;
+	}
 	char *p = &states.modem.rx_response[10];
 	char *q = states.modem.myIP;
 	char num=0;

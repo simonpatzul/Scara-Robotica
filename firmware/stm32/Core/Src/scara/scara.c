@@ -330,12 +330,12 @@ void scara_publicar(void) {
 	char flags = pico_ok ? pico.flags : 0;
 
 	sprintf(json,
-		"{\"ciclo\":\"%s\",\"pico_ok\":%s,\"pc\":%s,\"seq\":%s,\"bomba\":%s,"
+		"{\"ciclo\":\"%s\",\"broker\":\"%s\",\"pico_ok\":%s,\"pc\":%s,\"seq\":%s,\"bomba\":%s,"
 		"\"temp\":{\"pico\":0,\"stm32\":0},\"ejes\":["
 		"{\"n\":\"R1\",\"est\":\"%c\",\"pos\":%s,\"i\":%s,\"falla\":\"%s\"},"
 		"{\"n\":\"R2\",\"est\":\"%c\",\"pos\":%s,\"i\":%s,\"falla\":\"%s\"},"
 		"{\"n\":\"P\",\"est\":\"%c\",\"pos\":%s,\"i\":%s,\"falla\":\"%s\"}]}",
-		ciclo, pico_ok ? "true" : "false",
+		ciclo, states.mqtt.IP_DNS, pico_ok ? "true" : "false",
 		(flags & 1) ? "true" : "false", (flags & 2) ? "true" : "false", (flags & 4) ? "true" : "false",
 		est[0], pos[0], amp[0], txt_falla[0],
 		est[1], pos[1], amp[1], txt_falla[1],

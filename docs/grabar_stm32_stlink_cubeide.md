@@ -52,7 +52,15 @@ Trae todo el contexto que hace falta para grabar el firmware nuevo del STM32 y c
    - `EST` + nombre del ciclo cada vez que cambia.
 5. **Protecciones de corriente solo en R1 y R2.** P se mide y se publica, pero no entra en falla.
    `PROTECCION_CORTA_EN = 0` en `scara.c`: una falla solo avisa, no apaga los EN.
-6. Tamaño en Debug (-O0): unos **45 KB de 64 KB** de flash y 4.8 KB de RAM.
+6. **Busca solo el PC con Mosquitto** (`FC41/broker.c`). No hace falta cambiar `DEFAULT_IP` cuando la red "Simon" (hotspot del celular) le da otra IP al PC.
+   - Activa `AT+QGETIP` (`SKIP_GETIP 0`) para saber su IP y la puerta de enlace.
+   - Orden: la última IP que funcionó → `DEFAULT_IP` → la puerta de enlace → toda su subred (x.x.x.1 a .254).
+   - Cada IP espera `ESPERA_BROKER_MS` = 2.5 s; si no contesta, manda `AT+QMTCLOSE=1` y pasa a la siguiente.
+   - La IP que conecta se guarda en la **última página de la flash (0x0800FC00)**. Por eso el `.ld` deja `LENGTH = 63K`; no lo regreses a 64K.
+   - La primera búsqueda en una red nueva puede tardar varios minutos; después arranca directo.
+   - `scara/estado` trae `"broker":"<ip>"` con la IP que está usando.
+   - Si el PC con Mosquitto tiene el firewall cerrado al 1883, no lo encuentra: correr `mqtt_scada/servidor/abrir_mosquitto_red.bat`.
+7. Tamaño en Debug (-O0): unos **47.6 KB de 63 KB** de flash y 4.8 KB de RAM.
    No uses `strtof` ni `printf("%f")`: con eso deja de caber. Por eso `scara.c` tiene su propio `leer_numero()`.
 
 ## Pasos para grabar con ST-Link V2 y CubeIDE
@@ -61,7 +69,7 @@ Trae todo el contexto que hace falta para grabar el firmware nuevo del STM32 y c
    - El proyecto se llama `scara_stm32`. No copies el proyecto al workspace si quieres que siga ligado al repo.
    - **No regeneres el código desde el `.ioc`** (no abras el `.ioc` para "Generate Code"). El I2C no está en el `.ioc`. `enlace.c` sobreviviría, pero es un riesgo innecesario.
 3. **Project → Build Project** (configuración Debug).
-   - Debe terminar sin errores y el resumen debe mostrar unos 45 KB de FLASH.
+   - Debe terminar sin errores y el resumen debe mostrar unos 47.6 KB de FLASH (de 63 KB).
    - Si dice que `FLASH` se desborda, alguien agregó `strtof` o `%f`.
 4. Cableado del ST-Link V2 al conector **J1** (SWD):
 
