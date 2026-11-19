@@ -58,6 +58,10 @@ static char repetida(int p, const char *ip) {
 
 
 void broker_inicio(const char *mi_ip, const char *gw, const char *ip_default) {
+	static char iniciado = 0;
+	// Misma red que antes (p. ej. tras reiniciar el FC41 a media busqueda): seguir donde iba, no empezar de nuevo
+	if (iniciado && mi_ip != 0 && strcmp(mi_ip, propia) == 0) return;
+	iniciado = 1;
 	leer_flash();
 	copiar(por_defecto, ip_default);
 	copiar(puerta, gw);

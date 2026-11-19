@@ -49,6 +49,8 @@ enum FC41_EVENTS {
 	EV_FC41_postok,
 	EV_FC41_posterr,
 	EV_FC41_jsonpost,
+	EV_FC41_ocupado,     //(SCARA) "+QMTOPEN: 1,2": el cliente MQTT sigue abriendo la IP anterior
+	EV_FC41_cerrado,     //(SCARA) "+QMTCLOSE: 1,...": el cliente MQTT quedo libre
 };
 
 enum FC41_STATE {
@@ -91,6 +93,7 @@ enum FC41_STATE {
 	FC_complete_post,
 	FC_complete_postrx,
 	FC_post_status,
+	FC_CLOSE_WAIT,       //(SCARA) esperar a que el cliente MQTT quede libre antes de otro QMTOPEN
 };
 
 enum PC41_STATE_RX {
@@ -188,6 +191,8 @@ int fc41_timelimit=100;
 #define SKIP_WAIT1	1
 #define SKIP_GETIP	0   // (SCARA) 0: se pide la IP propia y la puerta de enlace, para buscar el broker en la subred
 #define ESPERA_BROKER_MS	2500   // (SCARA) si Mosquitto no contesta en este tiempo, se prueba la siguiente IP
+#define CIERRE_MAX_MS		20000  // (SCARA) si el cliente MQTT no queda libre en este tiempo, se reinicia el FC41 (CEN)
+#define MAX_OCUPADO			3      // (SCARA) "ocupado" seguidos con la misma IP: reiniciar el FC41
 
 void init_FC(void) {
 	strcpy(states.modem.SSID,(char *)DEFAULT_SSID);
@@ -272,13 +277,36 @@ void clearisNewMQTTReceive(void) {
 // Si ya se probaron todas, esperar 10 s antes de dar otra vuelta
 static char broker_listo = 0;
 
-static void otra_ip(void) {
+// Despues de un QMTOPEN que no contesto, el FC41 sigue abriendo esa IP y todo QMTOPEN nuevo da "ocupado" (1,2),
+// incluso el del broker correcto. Por eso: AT+QMTCLOSE=1 y esperar a que el cliente quede libre (FC_CLOSE_WAIT);
+// si no se libera en CIERRE_MAX_MS, reiniciar el FC41. La lista de IPs no se pierde: sigue por la siguiente.
+static char avanzar_ip = 0;   // al liberarse: 1 = probar la siguiente IP, 0 = repetir la misma
+static char ocupados = 0;     // "ocupado" seguidos
+
+static void cerrar_y_seguir(char avanzar) {
 	HAL_UART_Transmit_IT(&huart1, commands[QCLOSE], strlen((char *)commands[QCLOSE]));
-	char vuelta = broker_siguiente();
-	fc41_next_state = FC_OPEN_WAIT;
+	avanzar_ip = avanzar;
+	fc41_next_state = FC_CLOSE_WAIT;
 	fc41_timeout=1;
-	fc41_timelimit = vuelta ? 500 : 10000;
+	fc41_timelimit = CIERRE_MAX_MS;
 	fc41_event=0;
+}
+
+static void otra_ip(void) {
+	ocupados = 0;
+	cerrar_y_seguir(1);
+}
+
+// El cliente seguia ocupado: liberar y repetir la MISMA IP (podria ser la buena)
+static void ip_ocupada(void) {
+	if (++ocupados >= MAX_OCUPADO) {
+		ocupados = 0;
+		fc41_next_state = FC_start;   // reiniciar el FC41 (CEN): vuelve a conectarse al Wi-Fi y sigue con esta IP
+		fc41_timeout=0;
+		fc41_event=0;
+		return;
+	}
+	cerrar_y_seguir(0);
 }
 
 void FC41_state_machine(void) {
@@ -540,7 +568,9 @@ void FC41_state_machine(void) {
 			fc41_event=0;
 		}
 		//(SCARA) "+QMTOPEN: 1,<error>" puede llegar sin el OK (p. ej. IP invalida): probar la siguiente
-		if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout || fc41_event == EV_FC41_sessionError) {
+		if (fc41_event == EV_FC41_ocupado) {
+			ip_ocupada();
+		} else if (fc41_event == EV_FC41_error || fc41_event == EV_FC41_timeout || fc41_event == EV_FC41_sessionError) {
 			otra_ip();
 		}
 		break;
@@ -548,12 +578,32 @@ void FC41_state_machine(void) {
 	case FC_OPEN_state:
 		if (fc41_event == EV_FC41_session) {
 			broker_encontrado();                //(SCARA) esta IP sirve: guardarla
+			ocupados = 0;
 			fc41_next_state = FC_CONN_BROKER;
 			fc41_timeout=0;
 			fc41_event=0;
 		}
-		if (fc41_event == EV_FC41_sessionError || fc41_event == EV_FC41_timeout) {
+		if (fc41_event == EV_FC41_ocupado) {
+			ip_ocupada();
+		} else if (fc41_event == EV_FC41_sessionError || fc41_event == EV_FC41_timeout) {
 			otra_ip();
+		}
+		break;
+
+	case FC_CLOSE_WAIT:
+		//(SCARA) libre cuando el FC41 confirma el cierre o cuando el QMTOPEN viejo termina (con error o no).
+		// Un ERROR al QMTCLOSE no basta: puede ser que la conexion todavia se este abriendo
+		if (fc41_event == EV_FC41_cerrado || fc41_event == EV_FC41_sessionError || fc41_event == EV_FC41_session) {
+			char vuelta = avanzar_ip ? broker_siguiente() : 1;
+			fc41_next_state = FC_OPEN_WAIT;
+			fc41_timeout=1;
+			fc41_timelimit = vuelta ? 300 : 10000;   // ya se probaron todas: 10 s antes de otra vuelta
+			fc41_event=0;
+		} else if (fc41_event == EV_FC41_timeout) {
+			if (avanzar_ip) broker_siguiente();
+			fc41_next_state = FC_start;   // no se libero: reiniciar el FC41
+			fc41_timeout=0;
+			fc41_event=0;
 		}
 		break;
 
@@ -840,8 +890,12 @@ void fc41_process(void) {
 		get_ip();
 	}
 	if (strncmp(states.modem.rx_response,"QMTOPEN: 1,",11)==0) {
-		//(SCARA) 0 = conecto; cualquier otro codigo (-1, 1..5) = esa IP no sirve
-		fc41_event = (states.modem.rx_response[11]=='0') ? EV_FC41_session : EV_FC41_sessionError;
+		//(SCARA) 0 = conecto; 2 = el cliente sigue ocupado con la IP anterior; otro codigo (-1, 1, 3..5) = esa IP no sirve
+		char c = states.modem.rx_response[11];
+		fc41_event = (c=='0') ? EV_FC41_session : (c=='2') ? EV_FC41_ocupado : EV_FC41_sessionError;
+	}
+	if (strncmp(states.modem.rx_response,"QMTCLOSE: 1,",12)==0) {
+		fc41_event=EV_FC41_cerrado;
 	}
 	if (strncmp(states.modem.rx_response,"QMTCONN: 1,0,0",14)==0) {
 		fc41_event=EV_FC41_broker;
@@ -900,9 +954,16 @@ static const char *siguiente_ip(const char *p, char *dst) {
 
 void get_ip(void) {
 	char ip[16], mascara[16], gw[16];
+	// El FC41D contesta "ip:...,gate:...,mask:...,dns:...": si trae las etiquetas se usan;
+	// si no, se supone el orden ip, mascara, puerta
 	const char *r = siguiente_ip(states.modem.rx_response, ip);
-	r = siguiente_ip(r, mascara);
-	siguiente_ip(r, gw);
+	const char *g = strstr(states.modem.rx_response, "gate");
+	if (g != 0) {
+		siguiente_ip(g, gw);
+	} else {
+		r = siguiente_ip(r, mascara);
+		siguiente_ip(r, gw);
+	}
 	if (ip[0] != 0) {
 		broker_inicio(ip, gw, DEFAULT_IP);
 		broker_listo = 1;

@@ -30,11 +30,15 @@ Las direcciones salen de `arm-none-eabi-nm -S Debug/scara_stm32.elf`.
 | `actual`, `paso` (broker.c) | IP del broker que está probando |
 | `states` | contiene la última respuesta del FC41 (`rx_response`) y el último comando AT |
 
-## Pendiente (bugs encontrados, sin arreglar)
-1. **"Identificador MQTT ocupado".** Al probar una IP que no contesta, el FC41 se queda abriendo esa conexión más de 2.5 s. Después, **todos** los `AT+QMTOPEN` devuelven `+QMTOPEN: 1,2`, incluso el del PC correcto. Por eso la búsqueda en la subred (`broker.c`) no encuentra el broker.
-   - Arreglo propuesto: cuando llegue el código 2, esperar la respuesta de `AT+QMTCLOSE=1` (o reiniciar el FC41 con CEN) antes de probar la siguiente IP.
-   - Mientras tanto: si el PC cambia de IP, cambiar `DEFAULT_IP`. Ojo: la IP que funcionó queda guardada en la flash (`0x0800FC00`) y se prueba primero.
-2. **`get_ip()` toma la máscara como puerta de enlace.** El FC41 contesta `ip:...,gate:...,mask:...,dns:...`, así que la puerta de enlace es la **segunda** dirección, no la tercera. Solo hace perder un intento con `255.255.255.0`.
+## Pendiente (bugs encontrados)
+1. ~~**"Identificador MQTT ocupado".**~~ **Arreglado en el commit siguiente (sin probar en la placa).**
+   - Antes: tras una IP que no contesta, todos los `AT+QMTOPEN` daban `+QMTOPEN: 1,2`.
+   - Ahora: `AT+QMTCLOSE=1` y espera (`FC_CLOSE_WAIT`) a que el FC41 confirme `+QMTCLOSE: 1,...` o a que termine el `QMTOPEN` viejo.
+   - Si no se libera en `CIERRE_MAX_MS` (20 s), o si da "ocupado" 3 veces seguidas con la misma IP, reinicia el FC41 con CEN.
+   - Con el código 2 repite la **misma** IP, porque puede ser la buena.
+   - Tras reiniciar el FC41, la lista sigue por donde iba (si la IP propia es la misma).
+   - Ojo: cada IP sin broker puede costar hasta unos 20–35 s (espera + reinicio). En una red nueva, la búsqueda completa puede tardar mucho. La IP buena queda en la flash y la siguiente vez conecta al primer intento.
+2. ~~**`get_ip()` toma la máscara como puerta de enlace.**~~ **Arreglado:** si la respuesta trae `gate:`, la puerta se lee de ahí.
 3. **Grabación por SWD inestable.** El borrado y la escritura fallaban en páginas al azar con el robot en 12 V (leer sí funcionaba). Se grabó página por página con reintentos y luego se comparó toda la flash: 0 diferencias. Conviene revisar el GND y el ruido del J1.
 
 ## Siguiente: Home desde Linux y tareas por MQTT
