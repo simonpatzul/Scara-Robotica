@@ -18,7 +18,7 @@
 // ===== Configuracion (cambiar aqui) =====
 #define WIFI_RED     "Simon"
 #define WIFI_CLAVE   "12345678"
-#define BROKER_IP    "10.217.162.20"    // IP del PC con Mosquitto
+#define BROKER_IP    "10.206.63.20"    // IP del PC con Mosquitto
 #define LIMITE_A     3.0f               // alerta si un motor pasa de 3 A
 // Conversion del ADC a amperios: 3.3 V / 4095 cuentas / 470 ohm * 19500 (ganancia del sensor del IFX007T)
 #define AMP_POR_CUENTA  (3.3f / 4095.0f / 470.0f * 19500.0f)
@@ -129,7 +129,9 @@ static void amperios(char *dst, float a) {
 
 // ===== Programa principal (lo llama main.c) =====
 void scara_simple(void) {
-	// 1. Medir el cero de la corriente con los motores apagados
+	// 1. Prender los drivers y medir el cero de la corriente con los motores quietos
+	//    (con el EN prendido: el sensor del IFX007T cambia su nivel de reposo al activarse)
+	poner_motores(1);
 	HAL_ADCEx_Calibration_Start(&hadc);
 	HAL_ADC_Start_DMA(&hadc, (uint32_t *)adc, 6);
 	HAL_Delay(100);
@@ -140,8 +142,7 @@ void scara_simple(void) {
 	}
 	for (int c = 0; c < 6; c++) cero[c] = suma[c] / 50;
 
-	// 2. Prender los motores y conectarse a MQTT (reintenta hasta lograrlo)
-	poner_motores(1);
+	// 2. Conectarse a MQTT (reintenta hasta lograrlo)
 	HAL_UART_Receive_IT(&huart1, &byte_rx, 1);
 	while (!conectar()) { }
 
