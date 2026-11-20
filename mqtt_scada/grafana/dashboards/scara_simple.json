@@ -4,7 +4,7 @@
   "description": "Panel simple: corriente de los 3 motores, boton PARAR (apaga los 3 EN) y alertas. Las coordenadas se manejan por ROS 2 en la Linux.",
   "editable": true,
   "graphTooltip": 1,
-  "refresh": "2s",
+  "refresh": "5s",
   "schemaVersion": 41,
   "tags": ["scara"],
   "time": { "from": "now-5m", "to": "now" },
