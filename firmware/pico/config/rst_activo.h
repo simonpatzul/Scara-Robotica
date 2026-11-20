@@ -1,5 +1,5 @@
 #pragma once
-// Generado por bajo_nivel/control_rst/rst_diseno.py: controlador implementado {'wn': 15.0, 'zeta': 0.85, 'r': 0.5, 'kp': 5.0, 'ti': 0.2, 'td': 0.01}
+// Controlador RST del robot (diseñado con wn = 15, zeta = 0.85, r = 0.5, kp = 5, ti = 0.2, td = 0.01)
 #include "rst_controller.h"
 
 constexpr RstParams RST_ACTIVO = {

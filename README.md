@@ -5,10 +5,10 @@ SCARA RRP v2 (PCB con Pico RP2040 + STM32 + drivers IFX007T): firmware, ROS 2 Ja
 ## Carpetas
 | Carpeta | Qué hay |
 |---|---|
-| `firmware/pico/` | firmware de la Pico: `src/` y `config/` (scara_fw: RST, home, encoders) y `pruebas/` (programas de prueba) |
-| `firmware/stm32/` | firmware del STM32: todo en `Core/Src/scara_simple.c` (corriente, MQTT, PARAR, alertas) |
-| `bajo_nivel/` | PC ↔ robot: `home.sh`, `subir_controlador.sh`, `pruebas/` (ejes, servo, bomba, finales) y `control_rst/` (diseño del RST) |
-| `alto_nivel/` | `ros2_ws/` (bridge, ik, p2p, teleop, URDF), `secuencias/` (caja → bandeja) y `gemelo/` (RViz) |
+| `firmware/pico/` | firmware de la Pico (`scara_fw`): `src/` y `config/` (control RST, home, encoders, finales) |
+| `firmware/stm32/` | firmware del STM32: todo en `Core/Src/scara_simple.c` (corriente, MQTT, PARAR, alertas). Se graba con ST-Link desde STM32CubeIDE |
+| `bajo_nivel/` | `home.sh`: recarga la Pico y hace el Home |
+| `alto_nivel/` | `ros2_ws/` (bridge, ik, p2p, teleop) y `secuencias/` (caja → bandeja) |
 | `mqtt_scada/` | `servidor/` (server.js: MQTT ↔ PostgreSQL) y `grafana/` (dashboard: corriente, PARAR, alertas) |
 | `docs/` | `sistema_simple.md`: cómo funciona el monitoreo de corriente, la parada y las alertas |
 

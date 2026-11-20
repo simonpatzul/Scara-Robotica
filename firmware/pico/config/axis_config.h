@@ -3,7 +3,7 @@
 // Para replicar en otro eje: copias el bloque y cambias los números.
 #include <cstdint>
 #include "rst_controller.h"
-#include "rst_activo.h"   // lo genera bajo_nivel/control_rst/rst_diseno.py: el controlador que se elige en la página
+#include "rst_activo.h"   // coeficientes del controlador RST
 
 constexpr uint8_t NO_PIN = 0xFF;   // el driver no tiene ese pin (los EN de la PCB nueva los maneja el STM32)
 
